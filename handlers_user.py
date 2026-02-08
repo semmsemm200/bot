@@ -186,11 +186,17 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
         db.add_to_referral_balance(user["referrer_id"], reward)
 
     await query.edit_message_text(f"✅ تمت الموافقة على المهمة #{task_id}.\nالرصيد أُضيف للرصيد المحجوز.")
-    await context.bot.send_message(task["user_id"],
-        f"✅ تمت الموافقة على المهمة #{task_id}!\n"
-        f"💰 تم إضافة {task['price']} جنيه للرصيد المحجوز.\n"
-        f"⏳ سيتحول للرصيد المتاح بعد 48 ساعة."
-    )
+    
+    # Send notification to user
+    try:
+        await context.bot.send_message(
+            task["user_id"],
+            f"✅ تمت الموافقة على المهمة #{task_id}!\n"
+            f"💰 تم إضافة {task['price']} جنيه للرصيد المحجوز.\n"
+            f"⏳ سيتحول للرصيد المتاح بعد 48 ساعة."
+        )
+    except Exception as e:
+        await context.bot.send_message(query.from_user.id, f"⚠️ تعذر إرسال الإشعار للمستخدم: {str(e)}")
 
 
 # ==================== TASK: Admin rejects proof ====================
@@ -206,9 +212,13 @@ async def admin_reject_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(f"❌ تم رفض المهمة #{task_id}.")
     if task:
-        await context.bot.send_message(task["user_id"],
-            f"❌ تم رفض المهمة #{task_id}.\nلن يتم إضافة مكافأة."
-        )
+        try:
+            await context.bot.send_message(
+                task["user_id"],
+                f"❌ تم رفض المهمة #{task_id}.\nلن يتم إضافة مكافأة."
+            )
+        except Exception as e:
+            await context.bot.send_message(query.from_user.id, f"⚠️ تعذر إرسال الإشعار للمستخدم: {str(e)}")
 
 
 # ==================== TASK: Admin reports error ====================
