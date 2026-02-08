@@ -102,7 +102,7 @@ async def admin_withdrawals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_approve_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await query.answer("✅ تم قبول الطلب، أرسل الآن صورة الإيصال", show_alert=True)
     if not is_admin(query.from_user.id):
         return
 
@@ -113,16 +113,23 @@ async def admin_approve_withdrawal(update: Update, context: ContextTypes.DEFAULT
 
 async def admin_reject_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
         return
 
     wid = int(query.data.split("_")[-1])
     w = db.get_withdrawal(wid)
     db.reject_withdrawal(wid)
-    await query.edit_message_text(f"❌ تم رفض طلب السحب #{wid}. تم إرجاع الرصيد للمستخدم.")
+    
     if w:
-        await context.bot.send_message(w["user_id"], f"❌ تم رفض طلب السحب #{wid}.\nتم إرجاع الرصيد لحسابك.")
+        try:
+            await context.bot.send_message(w["user_id"], f"❌ تم رفض طلب السحب #{wid}.\nتم إرجاع الرصيد لحسابك.")
+            await query.answer("❌ تم رفض الطلب وإرجاع الرصيد وتم إرسال الإشعار", show_alert=True)
+        except Exception as e:
+            await query.answer(f"❌ تم الرفض لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
+    else:
+        await query.answer("❌ تم رفض الطلب", show_alert=True)
+    
+    await query.edit_message_text(f"❌ تم رفض طلب السحب #{wid}. تم إرجاع الرصيد للمستخدم.")
 
 
 # ==================== ADMIN USERS ====================
@@ -486,9 +493,14 @@ async def admin_do_cancel_task(update: Update, context: ContextTypes.DEFAULT_TYP
     task = db.get_task(task_id)
     if task:
         db.cancel_task(task_id)
+        try:
+            await context.bot.send_message(task["user_id"], f"❌ تم إلغاء المهمة #{task_id} بواسطة المشرف.")
+            await query.answer("✅ تم إلغاء المهمة وتم إرسال الإشعار للمستخدم", show_alert=True)
+        except Exception as e:
+            await query.answer(f"✅ تم إلغاء المهمة لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
         await query.edit_message_text(f"✅ تم إلغاء المهمة #{task_id}.")
-        await context.bot.send_message(task["user_id"], f"❌ تم إلغاء المهمة #{task_id} بواسطة المشرف.")
     else:
+        await query.answer("⚠️ المهمة غير موجودة", show_alert=True)
         await query.edit_message_text("⚠️ المهمة غير موجودة.")
 
 

@@ -185,8 +185,6 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reward = int(db.get_setting("referral_reward") or 2)
         db.add_to_referral_balance(user["referrer_id"], reward)
 
-    await query.edit_message_text(f"✅ تمت الموافقة على المهمة #{task_id}.\nالرصيد أُضيف للرصيد المحجوز.")
-    
     # Send notification to user
     try:
         await context.bot.send_message(
@@ -195,8 +193,11 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"💰 تم إضافة {task['price']} جنيه للرصيد المحجوز.\n"
             f"⏳ سيتحول للرصيد المتاح بعد 48 ساعة."
         )
+        await query.answer("✅ تمت الموافقة على المهمة وتم إرسال الإشعار للمستخدم", show_alert=True)
     except Exception as e:
-        await context.bot.send_message(query.from_user.id, f"⚠️ تعذر إرسال الإشعار للمستخدم: {str(e)}")
+        await query.answer(f"✅ تمت الموافقة لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
+    
+    await query.edit_message_text(f"✅ تمت الموافقة على المهمة #{task_id}.\nالرصيد أُضيف للرصيد المحجوز.")
 
 
 # ==================== TASK: Admin rejects proof ====================
@@ -210,15 +211,19 @@ async def admin_reject_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.reject_task(task_id)
     task = db.get_task(task_id)
 
-    await query.edit_message_text(f"❌ تم رفض المهمة #{task_id}.")
     if task:
         try:
             await context.bot.send_message(
                 task["user_id"],
                 f"❌ تم رفض المهمة #{task_id}.\nلن يتم إضافة مكافأة."
             )
+            await query.answer("❌ تم رفض المهمة وتم إرسال الإشعار للمستخدم", show_alert=True)
         except Exception as e:
-            await context.bot.send_message(query.from_user.id, f"⚠️ تعذر إرسال الإشعار للمستخدم: {str(e)}")
+            await query.answer(f"❌ تم الرفض لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
+    else:
+        await query.answer("❌ تم رفض المهمة", show_alert=True)
+    
+    await query.edit_message_text(f"❌ تم رفض المهمة #{task_id}.")
 
 
 # ==================== TASK: Admin reports error ====================

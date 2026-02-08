@@ -63,16 +63,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("المهمة غير موجودة.")
             return
         db.set_task_error(task_id, text)
-        await context.bot.send_message(
-            task["user_id"],
-            f"خطأ في المهمة #{task_id}:\n{text}\n\nيرجى إصلاح الخطأ وإرسال إثبات جديد (صورة)."
-        )
-        # Store that this user needs to resubmit
-        # We use bot_data so it persists across user contexts
-        if "resubmit_tasks" not in context.bot_data:
-            context.bot_data["resubmit_tasks"] = {}
-        context.bot_data["resubmit_tasks"][str(task["user_id"])] = task_id
-        await update.message.reply_text(f"تم إرسال ملاحظة الخطأ للمستخدم.")
+        try:
+            await context.bot.send_message(
+                task["user_id"],
+                f"⚠️ خطأ في المهمة #{task_id}:\n{text}\n\nيرجى إصلاح الخطأ وإرسال إثبات جديد (صورة)."
+            )
+            # Store that this user needs to resubmit
+            if "resubmit_tasks" not in context.bot_data:
+                context.bot_data["resubmit_tasks"] = {}
+            context.bot_data["resubmit_tasks"][str(task["user_id"])] = task_id
+            await update.message.reply_text(f"✅ تم إرسال ملاحظة الخطأ للمستخدم بنجاح.")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ تم حفظ الخطأ لكن تعذر إرسال الإشعار: {str(e)}")
         return
 
     # Admin: setting values
@@ -82,7 +84,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             val = int(text)
             db.set_setting(setting_key, str(val))
             names = {"task_price": "سعر المهمة", "referral_reward": "مكافأة الإحالة", "min_withdrawal": "الحد الأدنى للسحب"}
-            await update.message.reply_text(f"تم تغيير {names.get(setting_key, setting_key)} إلى {val}.")
+            await update.message.reply_text(f"✅ تم تغيير {names.get(setting_key, setting_key)} إلى {val} بنجاح.")
         except ValueError:
             await update.message.reply_text("يرجى إرسال رقم صحيح.")
         return
@@ -152,7 +154,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user = db.get_user(target_id)
             if user:
                 db.clear_user_balance(target_id)
-                await update.message.reply_text(f"تم مسح رصيد المستخدم {target_id} بالكامل.")
+                await update.message.reply_text(f"✅ تم مسح رصيد المستخدم {target_id} بالكامل بنجاح.")
             else:
                 await update.message.reply_text("المستخدم غير موجود.")
         except ValueError:
@@ -203,8 +205,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.pop("admin_rewarding_user_step")
             
             db.add_to_available(target_id, amount)
-            await update.message.reply_text(f"✅ تم إضافة {amount} جنيه للمستخدم {target_id}.")
-            await context.bot.send_message(target_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
+            try:
+                await context.bot.send_message(target_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
+                await update.message.reply_text(f"✅ تم إضافة {amount} جنيه للمستخدم {target_id} وتم إرساله الإشعار.")
+            except Exception as e:
+                await update.message.reply_text(f"✅ تم إضافة {amount} جنيه للمستخدم {target_id} لكن تعذر إرسال الإشعار: {str(e)}")
         except ValueError:
             await update.message.reply_text("يرجى إرسال رقم صحيح.")
             context.user_data.pop("admin_rewarding_user_step", None)
@@ -220,12 +225,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user:
                 if db.is_user_banned(target_id):
                     db.unban_user(target_id)
-                    await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {target_id}.")
-                    await context.bot.send_message(target_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
+                    try:
+                        await context.bot.send_message(target_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
+                        await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {target_id} وتم إرسال الإشعار.")
+                    except Exception as e:
+                        await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {target_id} لكن تعذر إرسال الإشعار: {str(e)}")
                 else:
                     db.ban_user(target_id)
-                    await update.message.reply_text(f"🚫 تم حظر المستخدم {target_id}.")
-                    await context.bot.send_message(target_id, "⛔ تم حظرك من استخدام البوت.")
+                    try:
+                        await context.bot.send_message(target_id, "⛔ تم حظرك من استخدام البوت.")
+                        await update.message.reply_text(f"🚫 تم حظر المستخدم {target_id} وتم إرسال الإشعار.")
+                    except Exception as e:
+                        await update.message.reply_text(f"🚫 تم حظر المستخدم {target_id} لكن تعذر إرسال الإشعار: {str(e)}")
             else:
                 await update.message.reply_text("المستخدم غير موجود.")
         except ValueError:
@@ -238,7 +249,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             new_admin_id = int(text)
             db.add_admin(new_admin_id)
-            await update.message.reply_text(f"تم إضافة المشرف {new_admin_id}.")
+            await update.message.reply_text(f"✅ تم إضافة المشرف {new_admin_id} بنجاح.")
         except ValueError:
             await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
         return
@@ -249,10 +260,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             rem_id = int(text)
             if rem_id == ADMIN_ID:
-                await update.message.reply_text("لا يمكن إزالة المشرف الرئيسي.")
+                await update.message.reply_text("❌ لا يمكن إزالة المشرف الرئيسي.")
             else:
                 db.remove_admin(rem_id)
-                await update.message.reply_text(f"تم إزالة المشرف {rem_id}.")
+                await update.message.reply_text(f"✅ تم إزالة المشرف {rem_id} بنجاح.")
         except ValueError:
             await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
         return
@@ -354,11 +365,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         db.approve_withdrawal(wid)
         db.set_withdrawal_receipt(wid, file_id)
-        await update.message.reply_text(f"تم قبول طلب السحب #{wid}.")
-        await context.bot.send_photo(
-            w["user_id"], file_id,
-            caption=f"تم تنفيذ طلب السحب #{wid}\nالمبلغ: {w['amount']} جنيه\nالطريقة: {w['method']}"
-        )
+        try:
+            await context.bot.send_photo(
+                w["user_id"], file_id,
+                caption=f"✅ تم تنفيذ طلب السحب #{wid}\nالمبلغ: {w['amount']} جنيه\nالطريقة: {w['method']}"
+            )
+            await update.message.reply_text(f"✅ تم قبول طلب السحب #{wid} وتم إرسال الإيصال للمستخدم.")
+        except Exception as e:
+            await update.message.reply_text(f"✅ تم قبول الطلب لكن تعذر إرسال الإيصال: {str(e)}")
         return
 
     await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
