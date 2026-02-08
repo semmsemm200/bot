@@ -1,193 +1,440 @@
-import os
-import sqlite3
-import datetime
+import db
+from config import TOKEN, ADMIN_ID
+from helpers import is_admin, get_main_menu_keyboard, send_to_admins, send_photo_to_admins
+from handlers_user import (
+    start, check_subscription, menu_command, back_to_menu,
+    new_task, admin_send_task_data, task_done, task_cancel, task_how_to,
+    admin_approve_task, admin_reject_task, admin_error_task,
+    balance, my_tasks, withdraw, withdraw_method_selected,
+    withdrawal_history, referrals, leaderboard, withdraw_referral,
+    help_cmd, tutorial
+)
+from handlers_admin import (
+    admin_panel, admin_pending_tasks, admin_withdrawals,
+    admin_approve_withdrawal, admin_reject_withdrawal,
+    admin_users, admin_users_list, admin_reserved, admin_release_task,
+    admin_settings, admin_toggle_bot,
+    admin_set_task_price, admin_set_ref_reward, admin_set_min_w,
+    admin_set_fees, admin_edit_method, admin_method_min, admin_method_fee,
+    admin_add_method, admin_search_user, admin_clear_balance,
+    admin_cancel_task_prompt, admin_manage_admins,
+    admin_add_admin, admin_remove_admin, admin_set_video
+)
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    ContextTypes, MessageHandler, filters
+)
 
-# =======================
-# إعداد البوت
-# =======================
-import os 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")  # تأكد من تعيين المتغير البيئي TELEGRAM_BOT_TOKEN
-ADMIN_ID = 5620024477
-CHANNEL_LINK = "https://t.me/gmailfarmermax"
 
-# =======================
-# قاعدة البيانات
-# =======================
-conn = sqlite3.connect("bot.db", check_same_thread=False)
-cursor = conn.cursor()
-
-# إنشاء الجداول لو مش موجودة
-cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
-    username TEXT,
-    available INTEGER DEFAULT 0,
-    reserved INTEGER DEFAULT 0,
-    referrals INTEGER DEFAULT 0
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    description TEXT,
-    price INTEGER,
-    status TEXT DEFAULT 'pending',
-    proof TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    method TEXT,
-    data TEXT,
-    amount INTEGER,
-    status TEXT DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS referrals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    referrer_id INTEGER,
-    referred_id INTEGER,
-    task_completed INTEGER DEFAULT 0
-)''')
-
-conn.commit()
-
-# =======================
-# الوظائف الأساسية
-# =======================
-
-def add_user(user_id, username):
-    cursor.execute("INSERT OR IGNORE INTO users (id, username) VALUES (?, ?)", (user_id, username))
-    conn.commit()
-
-def get_user(user_id):
-    cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
-    row = cursor.fetchone()
-    if row:
-        return {"id": row[0], "username": row[1], "available": row[2], "reserved": row[3], "referrals": row[4]}
-    else:
-        return None
-
-def add_task(user_id, description, price):
-    cursor.execute("INSERT INTO tasks (user_id, description, price) VALUES (?, ?, ?)", (user_id, description, price))
-    conn.commit()
-    return cursor.lastrowid
-
-def get_tasks(user_id):
-    cursor.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
-    return cursor.fetchall()
-
-def add_withdrawal(user_id, method, data, amount):
-    cursor.execute("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?)", (user_id, method, data, amount))
-    conn.commit()
-    return cursor.lastrowid
-
-# =======================
-# أوامر المستخدم
-# =======================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ==================== MESSAGE HANDLER ====================
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    username = update.effective_user.username or update.effective_user.first_name
-    add_user(user_id, username)
-    msg = f"أهلاً 👋\nمرحبًا كل شيء بسيط وسهل، ستقوم بعمل مهمات مقابل مكافآت.\nيرجى الانضمام للقناة أولاً: {CHANNEL_LINK}"
-    await update.message.reply_text(msg)
-    await show_menu(update, context)
+    text = update.message.text
 
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("طلب مهمة جديدة", callback_data="new_task")],
-        [InlineKeyboardButton("رصيدي", callback_data="balance")],
-        [InlineKeyboardButton("مهامي", callback_data="my_tasks")],
-        [InlineKeyboardButton("سحب الأرباح", callback_data="withdraw")],
-        [InlineKeyboardButton("الإحالات", callback_data="referrals")],
-        [InlineKeyboardButton("مساعدة", callback_data="help")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("اختر من القائمة:", reply_markup=reply_markup)
-
-# =======================
-# التعامل مع الأزرار
-# =======================
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    user = get_user(user_id)
-
-    if query.data == "new_task":
-        task_price = 10  # مثال على سعر المهمة، المشرف يقدر يغير
-        task_id = add_task(user_id, "مهمة جديدة", task_price)
-        await query.edit_message_text(f"✅ تم طلب مهمة جديدة.\nسعر المهمة: {task_price} وحدة\nفي انتظار بيانات المشرف.")
-
-        # إشعار للمشرف
-        await context.bot.send_message(ADMIN_ID, f"المستخدم {user_id} طلب مهمة جديدة.\nTask ID: {task_id}\nيرجى إرسال بيانات المهمة.")
-
-    elif query.data == "balance":
-        msg = (
-            f"ID: {user['id']}\n"
-            f"رصيد متاح: {user['available']}\n"
-            f"رصيد محجوز: {user['reserved']}\n"
-            f"رصيد الإحالات: {user['referrals']}\n\n"
-            "(الرصيد المحجوز يتحول لرصيد متاح بعد 48 ساعة)"
-        )
-        await query.edit_message_text(msg)
-
-    elif query.data == "my_tasks":
-        tasks_list = get_tasks(user_id)
-        if not tasks_list:
-            await query.edit_message_text("ليس لديك مهام حالياً.")
+    # Admin: sending task data
+    if context.user_data.get("admin_sending_data_for_task") and is_admin(user_id):
+        task_id = context.user_data.pop("admin_sending_data_for_task")
+        task = db.get_task(task_id)
+        if not task:
+            await update.message.reply_text("المهمة غير موجودة.")
             return
-        msg = "مهامك:\n"
-        for t in tasks_list:
-            msg += f"Task ID {t[0]} - {t[3]} وحدة - الحالة: {t[4]}\n"
-        await query.edit_message_text(msg)
-
-    elif query.data == "help":
-        msg = (
-            "ℹ️ المساعدة\n\n"
-            "📋 طلب مهمة: اطلب مهمة جديدة\n"
-            "💰 رصيدي: عرض رصيدك الحالي\n"
-            "📊 مهامي: عرض قائمة مهامك\n"
-            "💸 سحب الأرباح: طلب سحب الأرباح\n"
-            "👥 الإحالات: عرض رابط الإحالة الخاص بك\n"
-            "🎬 طريقة عمل المهمة: شاهد فيديو توضيحي\n\n"
-            "💡 كيف يعمل النظام:\n"
-            "1. اطلب مهمة جديدة\n"
-            "2. ستحصل على بيانات الحساب\n"
-            "3. أنشئ الحساب وأرسل الإثبات\n"
-            "4. بعد الموافقة تحصل على المكافأة\n\n"
-            "📞 للدعم الفني: @gmailfarmermaxsupport"
-        )
-        await query.edit_message_text(msg)
-
-    elif query.data == "withdraw":
+        db.update_task_admin_data(task_id, text)
         keyboard = [
-            [InlineKeyboardButton("Vodafone Cash", callback_data="withdraw_vodafone")],
-            [InlineKeyboardButton("InstaPay", callback_data="withdraw_insta")],
-            [InlineKeyboardButton("Binance Pay", callback_data="withdraw_binance")],
+            [InlineKeyboardButton("تم التنفيذ", callback_data=f"task_done_{task_id}")],
+            [InlineKeyboardButton("إلغاء المهمة", callback_data=f"task_cancel_{task_id}")],
+            [InlineKeyboardButton("كيفية عمل المهمة", callback_data=f"task_howto_{task_id}")],
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("اختر طريقة السحب:", reply_markup=reply_markup)
+        await context.bot.send_message(
+            task["user_id"],
+            f"بيانات المهمة #{task_id}:\n\n{text}\n\nسعر المهمة: {task['price']} وحدة",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        await update.message.reply_text(f"تم إرسال بيانات المهمة #{task_id} للمستخدم.")
+        return
 
-    elif query.data.startswith("withdraw_"):
-        method = query.data.split("_")[1]
-        await query.edit_message_text(f"✉️ أرسل بيانات السحب لطريقة {method} وسيتم إرسال الطلب للمشرف.")
-        # هنا يقدر المستخدم يرسل بيانات السحب في رسالة لاحقة
+    # Admin: error description for task
+    if context.user_data.get("admin_error_task_id") and is_admin(user_id):
+        task_id = context.user_data.pop("admin_error_task_id")
+        task = db.get_task(task_id)
+        if not task:
+            await update.message.reply_text("المهمة غير موجودة.")
+            return
+        db.set_task_error(task_id, text)
+        await context.bot.send_message(
+            task["user_id"],
+            f"خطأ في المهمة #{task_id}:\n{text}\n\nيرجى إصلاح الخطأ وإرسال إثبات جديد (صورة)."
+        )
+        # Store that this user needs to resubmit
+        # We use bot_data so it persists across user contexts
+        if "resubmit_tasks" not in context.bot_data:
+            context.bot_data["resubmit_tasks"] = {}
+        context.bot_data["resubmit_tasks"][str(task["user_id"])] = task_id
+        await update.message.reply_text(f"تم إرسال ملاحظة الخطأ للمستخدم.")
+        return
 
+    # Admin: setting values
+    if context.user_data.get("admin_setting") and is_admin(user_id):
+        setting_key = context.user_data.pop("admin_setting")
+        try:
+            val = int(text)
+            db.set_setting(setting_key, str(val))
+            names = {"task_price": "سعر المهمة", "referral_reward": "مكافأة الإحالة", "min_withdrawal": "الحد الأدنى للسحب"}
+            await update.message.reply_text(f"تم تغيير {names.get(setting_key, setting_key)} إلى {val}.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم صحيح.")
+        return
+
+    # Admin: edit method min
+    if context.user_data.get("admin_edit_method_min") and is_admin(user_id):
+        method_name = context.user_data.pop("admin_edit_method_min")
+        try:
+            val = int(text)
+            db.update_withdrawal_method_min(method_name, val)
+            await update.message.reply_text(f"تم تغيير الحد الأدنى لـ {method_name} إلى {val}.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم صحيح.")
+        return
+
+    # Admin: edit method fee
+    if context.user_data.get("admin_edit_method_fee") and is_admin(user_id):
+        method_name = context.user_data.pop("admin_edit_method_fee")
+        try:
+            val = int(text)
+            db.update_withdrawal_method_fee(method_name, val)
+            await update.message.reply_text(f"تم تغيير رسوم {method_name} إلى {val}.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم صحيح.")
+        return
+
+    # Admin: add withdrawal method
+    if context.user_data.get("admin_adding_method") and is_admin(user_id):
+        context.user_data.pop("admin_adding_method")
+        db.add_withdrawal_method(text)
+        await update.message.reply_text(f"تم إضافة طريقة السحب: {text}")
+        return
+
+    # Admin: search user
+    if context.user_data.get("admin_searching_user") and is_admin(user_id):
+        context.user_data.pop("admin_searching_user")
+        try:
+            target_id = int(text)
+            user = db.get_user(target_id)
+            if user:
+                ref_count = db.get_referral_count(target_id)
+                stats = db.get_user_task_stats(target_id)
+                msg = (
+                    f"بيانات المستخدم:\n\n"
+                    f"ID: {user['id']}\n"
+                    f"الاسم: {user['username'] or '-'}\n"
+                    f"رصيد متاح: {user['available']}\n"
+                    f"رصيد محجوز: {user['reserved']}\n"
+                    f"رصيد إحالات: {user['referral_balance']}\n"
+                    f"إجمالي المهام: {stats['total']}\n"
+                    f"مهام مقبولة: {stats['approved']}\n"
+                    f"مهام مرفوضة: {stats['rejected']}\n"
+                    f"عدد الإحالات: {ref_count}"
+                )
+                await update.message.reply_text(msg)
+            else:
+                await update.message.reply_text("المستخدم غير موجود.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
+        return
+
+    # Admin: clear balance
+    if context.user_data.get("admin_clearing_balance") and is_admin(user_id):
+        context.user_data.pop("admin_clearing_balance")
+        try:
+            target_id = int(text)
+            user = db.get_user(target_id)
+            if user:
+                db.clear_user_balance(target_id)
+                await update.message.reply_text(f"تم مسح رصيد المستخدم {target_id} بالكامل.")
+            else:
+                await update.message.reply_text("المستخدم غير موجود.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
+        return
+
+    # Admin: cancel task
+    if context.user_data.get("admin_cancelling_task") and is_admin(user_id):
+        context.user_data.pop("admin_cancelling_task")
+        try:
+            task_id = int(text)
+            task = db.get_task(task_id)
+            if task:
+                db.cancel_task(task_id)
+                await update.message.reply_text(f"تم إلغاء المهمة #{task_id}.")
+                await context.bot.send_message(task["user_id"], f"تم إلغاء المهمة #{task_id} بواسطة المشرف.")
+            else:
+                await update.message.reply_text("المهمة غير موجودة.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم صحيح.")
+        return
+
+    # Admin: add admin
+    if context.user_data.get("admin_adding_admin") and is_admin(user_id):
+        context.user_data.pop("admin_adding_admin")
+        try:
+            new_admin_id = int(text)
+            db.add_admin(new_admin_id)
+            await update.message.reply_text(f"تم إضافة المشرف {new_admin_id}.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
+        return
+
+    # Admin: remove admin
+    if context.user_data.get("admin_removing_admin") and is_admin(user_id):
+        context.user_data.pop("admin_removing_admin")
+        try:
+            rem_id = int(text)
+            if rem_id == ADMIN_ID:
+                await update.message.reply_text("لا يمكن إزالة المشرف الرئيسي.")
+            else:
+                db.remove_admin(rem_id)
+                await update.message.reply_text(f"تم إزالة المشرف {rem_id}.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
+        return
+
+    # User: withdrawal data
+    if context.user_data.get("withdraw_method"):
+        method_name = context.user_data.pop("withdraw_method")
+        user = db.get_user(user_id)
+        if not user:
+            return
+        amount = user["available"]
+        method = db.get_withdrawal_method(method_name)
+        fee = method["fee"] if method else 0
+        final_amount = amount - fee
+        if final_amount <= 0:
+            await update.message.reply_text("رصيدك لا يكفي بعد خصم الرسوم.")
+            return
+        db.update_user_balance(user_id, available=0)
+        wid = db.create_withdrawal(user_id, method_name, text, amount)
+        await update.message.reply_text(
+            f"تم إرسال طلب السحب #{wid}\n"
+            f"الطريقة: {method_name}\n"
+            f"المبلغ: {amount} وحدة\n"
+            f"الرسوم: {fee} وحدة\n"
+            f"في انتظار موافقة المشرف."
+        )
+        kb = [
+            [InlineKeyboardButton("قبول", callback_data=f"admin_approve_w_{wid}"),
+             InlineKeyboardButton("رفض", callback_data=f"admin_reject_w_{wid}")]
+        ]
+        await send_to_admins(context,
+            f"طلب سحب جديد #{wid}\n"
+            f"مستخدم: {user_id}\n"
+            f"الطريقة: {method_name}\n"
+            f"البيانات: {text}\n"
+            f"المبلغ: {amount} وحدة",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+        return
+
+    # Default
+    await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
+
+
+# ==================== PHOTO HANDLER ====================
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    photo = update.message.photo[-1]
+    file_id = photo.file_id
+
+    # User: submitting task proof
+    if context.user_data.get("submitting_proof_for_task"):
+        task_id = context.user_data.pop("submitting_proof_for_task")
+        task = db.get_task(task_id)
+        if not task:
+            await update.message.reply_text("المهمة غير موجودة.")
+            return
+        db.update_task_proof(task_id, file_id)
+        await update.message.reply_text(f"تم إرسال الإثبات للمهمة #{task_id}. في انتظار مراجعة المشرف.")
+        kb = [
+            [InlineKeyboardButton("موافقة", callback_data=f"admin_approve_t_{task_id}")],
+            [InlineKeyboardButton("رفض", callback_data=f"admin_reject_t_{task_id}")],
+            [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
+        ]
+        await send_photo_to_admins(context, file_id,
+            f"إثبات المهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} وحدة",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+        return
+
+    # User: resubmitting proof after error
+    resubmit_tasks = context.bot_data.get("resubmit_tasks", {})
+    user_key = str(user_id)
+    if user_key in resubmit_tasks:
+        task_id = resubmit_tasks.pop(user_key)
+        task = db.get_task(task_id)
+        if not task:
+            await update.message.reply_text("المهمة غير موجودة.")
+            return
+        db.update_task_error_resubmit(task_id, file_id)
+        await update.message.reply_text(f"تم إرسال الإثبات الجديد للمهمة #{task_id}. في انتظار مراجعة المشرف.")
+        kb = [
+            [InlineKeyboardButton("موافقة", callback_data=f"admin_approve_t_{task_id}")],
+            [InlineKeyboardButton("رفض", callback_data=f"admin_reject_t_{task_id}")],
+            [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
+        ]
+        await send_photo_to_admins(context, file_id,
+            f"إثبات معاد للمهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} وحدة",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+        return
+
+    # Admin: sending withdrawal receipt
+    if context.user_data.get("admin_approve_withdrawal_id") and is_admin(user_id):
+        wid = context.user_data.pop("admin_approve_withdrawal_id")
+        w = db.get_withdrawal(wid)
+        if not w:
+            await update.message.reply_text("طلب السحب غير موجود.")
+            return
+        db.approve_withdrawal(wid)
+        db.set_withdrawal_receipt(wid, file_id)
+        await update.message.reply_text(f"تم قبول طلب السحب #{wid}.")
+        await context.bot.send_photo(
+            w["user_id"], file_id,
+            caption=f"تم تنفيذ طلب السحب #{wid}\nالمبلغ: {w['amount']} وحدة\nالطريقة: {w['method']}"
+        )
+        return
+
+    await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
+
+
+# ==================== VIDEO HANDLER ====================
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if context.user_data.get("admin_setting_video") and is_admin(user_id):
+        context.user_data.pop("admin_setting_video")
+        video = update.message.video
+        if video:
+            db.set_setting("tutorial_video_id", video.file_id)
+            await update.message.reply_text("تم حفظ فيديو الشرح.")
+        else:
+            await update.message.reply_text("يرجى إرسال فيديو.")
+        return
+    await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
+
+
+# ==================== CALLBACK ROUTER ====================
+async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+
+    if data == "check_sub":
+        await check_subscription(update, context)
+    elif data == "back_menu":
+        await back_to_menu(update, context)
+    elif data == "new_task":
+        await new_task(update, context)
+    elif data == "balance":
+        await balance(update, context)
+    elif data == "my_tasks":
+        await my_tasks(update, context)
+    elif data == "withdraw":
+        await withdraw(update, context)
+    elif data == "referrals":
+        await referrals(update, context)
+    elif data == "leaderboard":
+        await leaderboard(update, context)
+    elif data == "withdraw_referral":
+        await withdraw_referral(update, context)
+    elif data == "help":
+        await help_cmd(update, context)
+    elif data == "tutorial":
+        await tutorial(update, context)
+    elif data == "withdrawal_history":
+        await withdrawal_history(update, context)
+    elif data.startswith("task_done_"):
+        await task_done(update, context)
+    elif data.startswith("task_cancel_"):
+        await task_cancel(update, context)
+    elif data.startswith("task_howto_"):
+        await task_how_to(update, context)
+    elif data.startswith("admin_send_data_"):
+        await admin_send_task_data(update, context)
+    elif data.startswith("admin_approve_t_"):
+        await admin_approve_task(update, context)
+    elif data.startswith("admin_reject_t_"):
+        await admin_reject_task(update, context)
+    elif data.startswith("admin_error_t_"):
+        await admin_error_task(update, context)
+    elif data.startswith("wmethod_"):
+        await withdraw_method_selected(update, context)
+    elif data == "admin_panel":
+        await admin_panel(update, context)
+    elif data == "admin_pending_tasks":
+        await admin_pending_tasks(update, context)
+    elif data == "admin_withdrawals":
+        await admin_withdrawals(update, context)
+    elif data.startswith("admin_approve_w_"):
+        await admin_approve_withdrawal(update, context)
+    elif data.startswith("admin_reject_w_"):
+        await admin_reject_withdrawal(update, context)
+    elif data == "admin_users":
+        await admin_users(update, context)
+    elif data == "admin_users_list":
+        await admin_users_list(update, context)
+    elif data == "admin_reserved":
+        await admin_reserved(update, context)
+    elif data.startswith("admin_release_"):
+        await admin_release_task(update, context)
+    elif data == "admin_settings":
+        await admin_settings(update, context)
+    elif data == "admin_toggle_bot":
+        await admin_toggle_bot(update, context)
+    elif data == "admin_set_task_price":
+        await admin_set_task_price(update, context)
+    elif data == "admin_set_ref_reward":
+        await admin_set_ref_reward(update, context)
+    elif data == "admin_set_min_w":
+        await admin_set_min_w(update, context)
+    elif data == "admin_set_fees":
+        await admin_set_fees(update, context)
+    elif data.startswith("admin_edit_method_"):
+        await admin_edit_method(update, context)
+    elif data.startswith("admin_method_min_"):
+        await admin_method_min(update, context)
+    elif data.startswith("admin_method_fee_"):
+        await admin_method_fee(update, context)
+    elif data == "admin_add_method":
+        await admin_add_method(update, context)
+    elif data == "admin_search_user":
+        await admin_search_user(update, context)
+    elif data == "admin_clear_balance":
+        await admin_clear_balance(update, context)
+    elif data == "admin_cancel_task":
+        await admin_cancel_task_prompt(update, context)
+    elif data == "admin_manage_admins":
+        await admin_manage_admins(update, context)
+    elif data == "admin_add_admin":
+        await admin_add_admin(update, context)
+    elif data == "admin_remove_admin":
+        await admin_remove_admin(update, context)
+    elif data == "admin_set_video":
+        await admin_set_video(update, context)
     else:
-        await query.edit_message_text("⚠️ هذه الميزة قيد التطوير...")
+        await query.answer("غير معروف", show_alert=True)
 
-# =======================
-# تشغيل البوت
-# =======================
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("menu", show_menu))
-app.add_handler(CallbackQueryHandler(button_handler))
 
-print("🤖 البوت بدأ يشتغل...")
-app.run_polling()
+# ==================== MAIN ====================
+def main():
+    db.init_db()
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", menu_command))
+    app.add_handler(CallbackQueryHandler(callback_router))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.VIDEO, handle_video))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    print("البوت بدأ يشتغل...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
