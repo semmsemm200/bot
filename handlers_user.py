@@ -177,6 +177,10 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("❌ المهمة غير موجودة.")
         return
 
+    if task["status"] in ("approved", "released", "rejected", "cancelled"):
+        await query.edit_message_text(f"⚠️ المهمة #{task_id} تم التعامل معها بالفعل.")
+        return
+
     db.approve_task(task_id)
     db.add_to_reserved(task["user_id"], task["price"])
 
