@@ -263,7 +263,6 @@ async def admin_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"  - {m['name']}: حد أدنى {m['min_amount']} | رسوم {m['fee']}\n"
 
     keyboard = [
-    keyboard = [
         [InlineKeyboardButton("💰 تغيير سعر المهمة", callback_data="admin_set_task_price"),
          InlineKeyboardButton("👥 مكافأة الإحالة", callback_data="admin_set_ref_reward")],
         [InlineKeyboardButton("💸 الحد الأدنى للسحب", callback_data="admin_set_min_w"),
@@ -274,7 +273,6 @@ async def admin_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
             callback_data="admin_toggle_bot"
         )],
         [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")],
-    ]
     ]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
