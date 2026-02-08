@@ -297,8 +297,29 @@ async def admin_set_task_price(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_setting"] = "task_price"
-    await query.edit_message_text("💰 أرسل سعر المهمة الجديد (رقم):")
+    
+    keyboard = [
+        [InlineKeyboardButton("5 جنيه", callback_data="admin_price_5"),
+         InlineKeyboardButton("10 جنيه", callback_data="admin_price_10")],
+        [InlineKeyboardButton("15 جنيه", callback_data="admin_price_15"),
+         InlineKeyboardButton("20 جنيه", callback_data="admin_price_20")],
+        [InlineKeyboardButton("25 جنيه", callback_data="admin_price_25"),
+         InlineKeyboardButton("30 جنيه", callback_data="admin_price_30")],
+        [InlineKeyboardButton("🔙 الإعدادات", callback_data="admin_settings")]
+    ]
+    await query.edit_message_text("💰 اختر سعر المهمة الجديد:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_set_price_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    price = int(query.data.split("_")[-1])
+    db.set_setting("task_price", str(price))
+    await query.answer(f"✅ تم تغيير سعر المهمة إلى {price} جنيه", show_alert=True)
+    await admin_settings(update, context)
 
 
 async def admin_set_ref_reward(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -306,8 +327,29 @@ async def admin_set_ref_reward(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_setting"] = "referral_reward"
-    await query.edit_message_text("👥 أرسل مكافأة الإحالة الجديدة (رقم):")
+    
+    keyboard = [
+        [InlineKeyboardButton("1 جنيه", callback_data="admin_ref_1"),
+         InlineKeyboardButton("2 جنيه", callback_data="admin_ref_2")],
+        [InlineKeyboardButton("3 جنيه", callback_data="admin_ref_3"),
+         InlineKeyboardButton("5 جنيه", callback_data="admin_ref_5")],
+        [InlineKeyboardButton("10 جنيه", callback_data="admin_ref_10"),
+         InlineKeyboardButton("15 جنيه", callback_data="admin_ref_15")],
+        [InlineKeyboardButton("🔙 الإعدادات", callback_data="admin_settings")]
+    ]
+    await query.edit_message_text("👥 اختر مكافأة الإحالة الجديدة:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_set_ref_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    reward = int(query.data.split("_")[-1])
+    db.set_setting("referral_reward", str(reward))
+    await query.answer(f"✅ تم تغيير مكافأة الإحالة إلى {reward} جنيه", show_alert=True)
+    await admin_settings(update, context)
 
 
 async def admin_set_min_w(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -315,8 +357,29 @@ async def admin_set_min_w(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_setting"] = "min_withdrawal"
-    await query.edit_message_text("💸 أرسل الحد الأدنى للسحب الجديد (رقم):")
+    
+    keyboard = [
+        [InlineKeyboardButton("20 جنيه", callback_data="admin_minw_20"),
+         InlineKeyboardButton("30 جنيه", callback_data="admin_minw_30")],
+        [InlineKeyboardButton("50 جنيه", callback_data="admin_minw_50"),
+         InlineKeyboardButton("100 جنيه", callback_data="admin_minw_100")],
+        [InlineKeyboardButton("150 جنيه", callback_data="admin_minw_150"),
+         InlineKeyboardButton("200 جنيه", callback_data="admin_minw_200")],
+        [InlineKeyboardButton("🔙 الإعدادات", callback_data="admin_settings")]
+    ]
+    await query.edit_message_text("💸 اختر الحد الأدنى للسحب الجديد:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_set_minw_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    min_w = int(query.data.split("_")[-1])
+    db.set_setting("min_withdrawal", str(min_w))
+    await query.answer(f"✅ تم تغيير الحد الأدنى للسحب إلى {min_w} جنيه", show_alert=True)
+    await admin_settings(update, context)
 
 
 async def admin_set_fees(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -357,8 +420,30 @@ async def admin_method_min(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
     method_name = query.data.replace("admin_method_min_", "")
-    context.user_data["admin_edit_method_min"] = method_name
-    await query.edit_message_text(f"أرسل الحد الأدنى الجديد لـ {method_name} (رقم):")
+    
+    keyboard = [
+        [InlineKeyboardButton("20 جنيه", callback_data=f"admin_setmin_{method_name}_20"),
+         InlineKeyboardButton("30 جنيه", callback_data=f"admin_setmin_{method_name}_30")],
+        [InlineKeyboardButton("50 جنيه", callback_data=f"admin_setmin_{method_name}_50"),
+         InlineKeyboardButton("100 جنيه", callback_data=f"admin_setmin_{method_name}_100")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data=f"admin_edit_method_{method_name}")]
+    ]
+    await query.edit_message_text(f"اختر الحد الأدنى لـ {method_name}:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_set_method_min_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    parts = query.data.split("_")
+    method_name = parts[2]
+    value = int(parts[3])
+    
+    db.update_withdrawal_method_min(method_name, value)
+    await query.answer(f"✅ تم تغيير الحد الأدنى إلى {value} جنيه", show_alert=True)
+    await query.edit_message_text(f"✅ تم تغيير الحد الأدنى لـ {method_name} إلى {value} جنيه")
 
 
 async def admin_method_fee(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -367,8 +452,32 @@ async def admin_method_fee(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
     method_name = query.data.replace("admin_method_fee_", "")
-    context.user_data["admin_edit_method_fee"] = method_name
-    await query.edit_message_text(f"أرسل الرسوم الجديدة لـ {method_name} (رقم):")
+    
+    keyboard = [
+        [InlineKeyboardButton("0 جنيه", callback_data=f"admin_setfee_{method_name}_0"),
+         InlineKeyboardButton("5 جنيه", callback_data=f"admin_setfee_{method_name}_5")],
+        [InlineKeyboardButton("10 جنيه", callback_data=f"admin_setfee_{method_name}_10"),
+         InlineKeyboardButton("15 جنيه", callback_data=f"admin_setfee_{method_name}_15")],
+        [InlineKeyboardButton("20 جنيه", callback_data=f"admin_setfee_{method_name}_20"),
+         InlineKeyboardButton("25 جنيه", callback_data=f"admin_setfee_{method_name}_25")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data=f"admin_edit_method_{method_name}")]
+    ]
+    await query.edit_message_text(f"اختر الرسوم لـ {method_name}:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_set_method_fee_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    parts = query.data.split("_")
+    method_name = parts[2]
+    value = int(parts[3])
+    
+    db.update_withdrawal_method_fee(method_name, value)
+    await query.answer(f"✅ تم تغيير الرسوم إلى {value} جنيه", show_alert=True)
+    await query.edit_message_text(f"✅ تم تغيير رسوم {method_name} إلى {value} جنيه")
 
 
 async def admin_add_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -386,8 +495,52 @@ async def admin_search_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_searching_user"] = True
-    await query.edit_message_text("🔍 أرسل ID المستخدم:")
+    
+    # Get all users and show as buttons
+    users = db.get_all_users()
+    if not users:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    keyboard = []
+    for u in users[:30]:  # Show first 30 users
+        keyboard.append([InlineKeyboardButton(
+            f"👤 {u['username'] or u['id']} (ID: {u['id']})",
+            callback_data=f"admin_view_user_{u['id']}"
+        )])
+    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+    
+    await query.edit_message_text("👥 اختر مستخدم:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_view_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user(user_id)
+    if user:
+        ref_count = db.get_referral_count(user_id)
+        stats = db.get_user_task_stats(user_id)
+        msg = (
+            f"بيانات المستخدم:\n\n"
+            f"🆔 ID: {user['id']}\n"
+            f"👤 الاسم: {user['username'] or '-'}\n"
+            f"💰 رصيد متاح: {user['available']}\n"
+            f"🔒 رصيد محجوز: {user['reserved']}\n"
+            f"👥 رصيد إحالات: {user['referral_balance']}\n"
+            f"📋 إجمالي المهام: {stats['total']}\n"
+            f"✅ مهام مقبولة: {stats['approved']}\n"
+            f"❌ مهام مرفوضة: {stats['rejected']}\n"
+            f"🔗 عدد الإحالات: {ref_count}"
+        )
+        keyboard = [[InlineKeyboardButton("🔙 قائمة المستخدمين", callback_data="admin_search_user")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await query.edit_message_text("المستخدم غير موجود.")
 
 
 # ==================== ADMIN CLEAR BALANCE ====================
@@ -396,8 +549,46 @@ async def admin_clear_balance(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_clearing_balance"] = True
-    await query.edit_message_text("🗑️ أرسل ID المستخدم لمسح رصيده:")
+    
+    # Get all users and show as buttons
+    users = db.get_all_users()
+    if not users:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    keyboard = []
+    for u in users[:30]:
+        total = u['available'] + u['reserved'] + u['referral_balance']
+        if total > 0:  # Only show users with balance
+            keyboard.append([InlineKeyboardButton(
+                f"🗑️ {u['username'] or u['id']} - {total} جنيه",
+                callback_data=f"admin_do_clear_{u['id']}"
+            )])
+    
+    if not keyboard:
+        keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+        await query.edit_message_text("لا يوجد مستخدمين برصيد.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+    await query.edit_message_text("🗑️ اختر مستخدم لمسح رصيده:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_do_clear_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user(user_id)
+    if user:
+        db.clear_user_balance(user_id)
+        await query.answer(f"✅ تم مسح رصيد المستخدم {user_id} بنجاح", show_alert=True)
+        await query.edit_message_text(f"✅ تم مسح رصيد المستخدم {user['username'] or user_id} بالكامل.")
+    else:
+        await query.answer("المستخدم غير موجود", show_alert=True)
 
 
 # ==================== ADMIN CANCEL TASK ====================
@@ -510,9 +701,79 @@ async def admin_reward_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_rewarding_user_step"] = "id"
-    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-    await query.edit_message_text("🎁 أرسل ID المستخدم:", reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    # Get all users and show as buttons
+    users = db.get_all_users()
+    if not users:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    keyboard = []
+    for u in users[:30]:
+        keyboard.append([InlineKeyboardButton(
+            f"🎁 {u['username'] or u['id']} (رصيد: {u['available']})",
+            callback_data=f"admin_reward_select_{u['id']}"
+        )])
+    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+    
+    await query.edit_message_text("🎁 اختر مستخدم لإضافة مكافأة:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_reward_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user(user_id)
+    if not user:
+        await query.answer("المستخدم غير موجود", show_alert=True)
+        return
+    
+    # Show amount buttons
+    keyboard = [
+        [InlineKeyboardButton("10 جنيه", callback_data=f"admin_reward_amount_{user_id}_10"),
+         InlineKeyboardButton("20 جنيه", callback_data=f"admin_reward_amount_{user_id}_20")],
+        [InlineKeyboardButton("50 جنيه", callback_data=f"admin_reward_amount_{user_id}_50"),
+         InlineKeyboardButton("100 جنيه", callback_data=f"admin_reward_amount_{user_id}_100")],
+        [InlineKeyboardButton("200 جنيه", callback_data=f"admin_reward_amount_{user_id}_200"),
+         InlineKeyboardButton("500 جنيه", callback_data=f"admin_reward_amount_{user_id}_500")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="admin_reward_user")]
+    ]
+    
+    await query.edit_message_text(
+        f"👤 المستخدم: {user['username'] or user_id}\n"
+        f"💰 الرصيد الحالي: {user['available']} جنيه\n\n"
+        f"اختر مبلغ المكافأة:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def admin_reward_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    parts = query.data.split("_")
+    user_id = int(parts[-2])
+    amount = int(parts[-1])
+    
+    db.add_to_available(user_id, amount)
+    user = db.get_user(user_id)
+    
+    try:
+        await context.bot.send_message(user_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
+        await query.answer(f"✅ تم إضافة {amount} جنيه وتم إرسال الإشعار", show_alert=True)
+    except Exception as e:
+        await query.answer(f"✅ تم إضافة {amount} جنيه لكن تعذر إرسال الإشعار", show_alert=True)
+    
+    await query.edit_message_text(
+        f"✅ تم إضافة {amount} جنيه للمستخدم {user['username'] or user_id}\n"
+        f"💰 الرصيد الجديد: {user['available']} جنيه"
+    )
 
 
 # ==================== ADMIN BAN USER ====================
@@ -521,9 +782,56 @@ async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_banning_user"] = True
-    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-    await query.edit_message_text("🚫 أرسل ID المستخدم للحظر أو رفع الحظر:", reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    # Get all users and show as buttons
+    users = db.get_all_users()
+    if not users:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    keyboard = []
+    for u in users[:30]:
+        is_banned = db.is_user_banned(u['id'])
+        status = "🚫 محظور" if is_banned else "✅ نشط"
+        action = "رفع الحظر" if is_banned else "حظر"
+        keyboard.append([InlineKeyboardButton(
+            f"{status} {u['username'] or u['id']} - {action}",
+            callback_data=f"admin_do_ban_{u['id']}"
+        )])
+    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+    
+    await query.edit_message_text("🚫 اختر مستخدم للحظر/رفع الحظر:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_do_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user(user_id)
+    if not user:
+        await query.answer("المستخدم غير موجود", show_alert=True)
+        return
+    
+    if db.is_user_banned(user_id):
+        db.unban_user(user_id)
+        try:
+            await context.bot.send_message(user_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
+            await query.answer("✅ تم رفع الحظر وتم إرسال الإشعار", show_alert=True)
+        except Exception:
+            await query.answer("✅ تم رفع الحظر لكن تعذر إرسال الإشعار", show_alert=True)
+        await query.edit_message_text(f"✅ تم رفع الحظر عن المستخدم {user['username'] or user_id}")
+    else:
+        db.ban_user(user_id)
+        try:
+            await context.bot.send_message(user_id, "⛔ تم حظرك من استخدام البوت.")
+            await query.answer("🚫 تم حظر المستخدم وتم إرسال الإشعار", show_alert=True)
+        except Exception:
+            await query.answer("🚫 تم حظر المستخدم لكن تعذر إرسال الإشعار", show_alert=True)
+        await query.edit_message_text(f"🚫 تم حظر المستخدم {user['username'] or user_id}")
 
 
 # ==================== ADMIN TOGGLE BOT WITH NOTIFICATION ====================

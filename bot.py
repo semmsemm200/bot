@@ -14,12 +14,15 @@ from handlers_admin import (
     admin_approve_withdrawal, admin_reject_withdrawal,
     admin_users, admin_users_list, admin_reserved, admin_release_task,
     admin_settings, admin_toggle_bot,
-    admin_set_task_price, admin_set_ref_reward, admin_set_min_w,
-    admin_set_fees, admin_edit_method, admin_method_min, admin_method_fee,
-    admin_add_method, admin_search_user, admin_clear_balance,
+    admin_set_task_price, admin_set_price_value, admin_set_ref_reward, admin_set_ref_value,
+    admin_set_min_w, admin_set_minw_value,
+    admin_set_fees, admin_edit_method, admin_method_min, admin_set_method_min_value,
+    admin_method_fee, admin_set_method_fee_value,
+    admin_add_method, admin_search_user, admin_view_user, admin_clear_balance, admin_do_clear_balance,
     admin_cancel_task_prompt, admin_do_cancel_task, admin_manage_admins,
     admin_add_admin, admin_remove_admin, admin_set_video,
-    admin_reward_user, admin_ban_user, admin_toggle_bot_with_notification
+    admin_reward_user, admin_reward_select_user, admin_reward_amount,
+    admin_ban_user, admin_do_ban_user, admin_toggle_bot_with_notification
 )
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -75,197 +78,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ تم إرسال ملاحظة الخطأ للمستخدم بنجاح.")
         except Exception as e:
             await update.message.reply_text(f"⚠️ تم حفظ الخطأ لكن تعذر إرسال الإشعار: {str(e)}")
-        return
-
-    # Admin: setting values
-    if context.user_data.get("admin_setting") and is_admin(user_id):
-        setting_key = context.user_data.pop("admin_setting")
-        try:
-            val = int(text)
-            db.set_setting(setting_key, str(val))
-            names = {"task_price": "سعر المهمة", "referral_reward": "مكافأة الإحالة", "min_withdrawal": "الحد الأدنى للسحب"}
-            await update.message.reply_text(f"✅ تم تغيير {names.get(setting_key, setting_key)} إلى {val} بنجاح.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم صحيح.")
-        return
-
-    # Admin: edit method min
-    if context.user_data.get("admin_edit_method_min") and is_admin(user_id):
-        method_name = context.user_data.pop("admin_edit_method_min")
-        try:
-            val = int(text)
-            db.update_withdrawal_method_min(method_name, val)
-            await update.message.reply_text(f"تم تغيير الحد الأدنى لـ {method_name} إلى {val}.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم صحيح.")
-        return
-
-    # Admin: edit method fee
-    if context.user_data.get("admin_edit_method_fee") and is_admin(user_id):
-        method_name = context.user_data.pop("admin_edit_method_fee")
-        try:
-            val = int(text)
-            db.update_withdrawal_method_fee(method_name, val)
-            await update.message.reply_text(f"تم تغيير رسوم {method_name} إلى {val}.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم صحيح.")
-        return
-
-    # Admin: add withdrawal method
-    if context.user_data.get("admin_adding_method") and is_admin(user_id):
-        context.user_data.pop("admin_adding_method")
-        db.add_withdrawal_method(text)
-        await update.message.reply_text(f"تم إضافة طريقة السحب: {text}")
-        return
-
-    # Admin: search user
-    if context.user_data.get("admin_searching_user") and is_admin(user_id):
-        context.user_data.pop("admin_searching_user")
-        try:
-            target_id = int(text)
-            user = db.get_user(target_id)
-            if user:
-                ref_count = db.get_referral_count(target_id)
-                stats = db.get_user_task_stats(target_id)
-                msg = (
-                    f"بيانات المستخدم:\n\n"
-                    f"ID: {user['id']}\n"
-                    f"الاسم: {user['username'] or '-'}\n"
-                    f"رصيد متاح: {user['available']}\n"
-                    f"رصيد محجوز: {user['reserved']}\n"
-                    f"رصيد إحالات: {user['referral_balance']}\n"
-                    f"إجمالي المهام: {stats['total']}\n"
-                    f"مهام مقبولة: {stats['approved']}\n"
-                    f"مهام مرفوضة: {stats['rejected']}\n"
-                    f"عدد الإحالات: {ref_count}"
-                )
-                await update.message.reply_text(msg)
-            else:
-                await update.message.reply_text("المستخدم غير موجود.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
-        return
-
-    # Admin: clear balance
-    if context.user_data.get("admin_clearing_balance") and is_admin(user_id):
-        context.user_data.pop("admin_clearing_balance")
-        try:
-            target_id = int(text)
-            user = db.get_user(target_id)
-            if user:
-                db.clear_user_balance(target_id)
-                await update.message.reply_text(f"✅ تم مسح رصيد المستخدم {target_id} بالكامل بنجاح.")
-            else:
-                await update.message.reply_text("المستخدم غير موجود.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
-        return
-
-    # Admin: cancel task
-    if context.user_data.get("admin_cancelling_task") and is_admin(user_id):
-        context.user_data.pop("admin_cancelling_task")
-        try:
-            task_id = int(text)
-            task = db.get_task(task_id)
-            if task:
-                db.cancel_task(task_id)
-                await update.message.reply_text(f"تم إلغاء المهمة #{task_id}.")
-                await context.bot.send_message(task["user_id"], f"تم إلغاء المهمة #{task_id} بواسطة المشرف.")
-            else:
-                await update.message.reply_text("المهمة غير موجودة.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم صحيح.")
-        return
-
-    # Admin: reward user - step 1: get ID
-    if context.user_data.get("admin_rewarding_user_step") == "id" and is_admin(user_id):
-        try:
-            target_id = int(text)
-            user = db.get_user(target_id)
-            if user:
-                context.user_data["admin_rewarding_user_id"] = target_id
-                context.user_data["admin_rewarding_user_step"] = "amount"
-                await update.message.reply_text(
-                    f"👤 المستخدم: {user['username'] or target_id}\n"
-                    f"💰 الرصيد الحالي: {user['available']} جنيه\n\n"
-                    f"أرسل مبلغ المكافأة:"
-                )
-            else:
-                await update.message.reply_text("المستخدم غير موجود.")
-                context.user_data.pop("admin_rewarding_user_step", None)
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
-        return
-
-    # Admin: reward user - step 2: get amount
-    if context.user_data.get("admin_rewarding_user_step") == "amount" and is_admin(user_id):
-        try:
-            amount = int(text)
-            target_id = context.user_data.pop("admin_rewarding_user_id")
-            context.user_data.pop("admin_rewarding_user_step")
-            
-            db.add_to_available(target_id, amount)
-            try:
-                await context.bot.send_message(target_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
-                await update.message.reply_text(f"✅ تم إضافة {amount} جنيه للمستخدم {target_id} وتم إرساله الإشعار.")
-            except Exception as e:
-                await update.message.reply_text(f"✅ تم إضافة {amount} جنيه للمستخدم {target_id} لكن تعذر إرسال الإشعار: {str(e)}")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم صحيح.")
-            context.user_data.pop("admin_rewarding_user_step", None)
-            context.user_data.pop("admin_rewarding_user_id", None)
-        return
-
-    # Admin: ban/unban user
-    if context.user_data.get("admin_banning_user") and is_admin(user_id):
-        context.user_data.pop("admin_banning_user")
-        try:
-            target_id = int(text)
-            user = db.get_user(target_id)
-            if user:
-                if db.is_user_banned(target_id):
-                    db.unban_user(target_id)
-                    try:
-                        await context.bot.send_message(target_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
-                        await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {target_id} وتم إرسال الإشعار.")
-                    except Exception as e:
-                        await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {target_id} لكن تعذر إرسال الإشعار: {str(e)}")
-                else:
-                    db.ban_user(target_id)
-                    try:
-                        await context.bot.send_message(target_id, "⛔ تم حظرك من استخدام البوت.")
-                        await update.message.reply_text(f"🚫 تم حظر المستخدم {target_id} وتم إرسال الإشعار.")
-                    except Exception as e:
-                        await update.message.reply_text(f"🚫 تم حظر المستخدم {target_id} لكن تعذر إرسال الإشعار: {str(e)}")
-            else:
-                await update.message.reply_text("المستخدم غير موجود.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
-        return
-
-    # Admin: add admin
-    if context.user_data.get("admin_adding_admin") and is_admin(user_id):
-        context.user_data.pop("admin_adding_admin")
-        try:
-            new_admin_id = int(text)
-            db.add_admin(new_admin_id)
-            await update.message.reply_text(f"✅ تم إضافة المشرف {new_admin_id} بنجاح.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
-        return
-
-    # Admin: remove admin
-    if context.user_data.get("admin_removing_admin") and is_admin(user_id):
-        context.user_data.pop("admin_removing_admin")
-        try:
-            rem_id = int(text)
-            if rem_id == ADMIN_ID:
-                await update.message.reply_text("❌ لا يمكن إزالة المشرف الرئيسي.")
-            else:
-                db.remove_admin(rem_id)
-                await update.message.reply_text(f"✅ تم إزالة المشرف {rem_id} بنجاح.")
-        except ValueError:
-            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
         return
 
     # User: withdrawal data
@@ -462,32 +274,52 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_toggle_bot_with_notification(update, context)
     elif data == "admin_set_task_price":
         await admin_set_task_price(update, context)
+    elif data.startswith("admin_price_"):
+        await admin_set_price_value(update, context)
     elif data == "admin_set_ref_reward":
         await admin_set_ref_reward(update, context)
+    elif data.startswith("admin_ref_"):
+        await admin_set_ref_value(update, context)
     elif data == "admin_set_min_w":
         await admin_set_min_w(update, context)
+    elif data.startswith("admin_minw_"):
+        await admin_set_minw_value(update, context)
     elif data == "admin_set_fees":
         await admin_set_fees(update, context)
     elif data.startswith("admin_method_min_"):
         await admin_method_min(update, context)
+    elif data.startswith("admin_setmin_"):
+        await admin_set_method_min_value(update, context)
     elif data.startswith("admin_method_fee_"):
         await admin_method_fee(update, context)
+    elif data.startswith("admin_setfee_"):
+        await admin_set_method_fee_value(update, context)
     elif data.startswith("admin_edit_method_"):
         await admin_edit_method(update, context)
     elif data == "admin_add_method":
         await admin_add_method(update, context)
     elif data == "admin_search_user":
         await admin_search_user(update, context)
+    elif data.startswith("admin_view_user_"):
+        await admin_view_user(update, context)
     elif data == "admin_clear_balance":
         await admin_clear_balance(update, context)
+    elif data.startswith("admin_do_clear_"):
+        await admin_do_clear_balance(update, context)
     elif data == "admin_cancel_task":
         await admin_cancel_task_prompt(update, context)
     elif data.startswith("admin_do_cancel_"):
         await admin_do_cancel_task(update, context)
     elif data == "admin_reward_user":
         await admin_reward_user(update, context)
+    elif data.startswith("admin_reward_select_"):
+        await admin_reward_select_user(update, context)
+    elif data.startswith("admin_reward_amount_"):
+        await admin_reward_amount(update, context)
     elif data == "admin_ban_user":
         await admin_ban_user(update, context)
+    elif data.startswith("admin_do_ban_"):
+        await admin_do_ban_user(update, context)
     elif data == "admin_manage_admins":
         await admin_manage_admins(update, context)
     elif data == "admin_add_admin":
