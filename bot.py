@@ -48,7 +48,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await context.bot.send_message(
             task["user_id"],
-            f"بيانات المهمة #{task_id}:\n\n{text}\n\nسعر المهمة: {task['price']} وحدة",
+            f"بيانات المهمة #{task_id}:\n\n{text}\n\nسعر المهمة: {task['price']} جنيه",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         await update.message.reply_text(f"تم إرسال بيانات المهمة #{task_id} للمستخدم.")
@@ -217,8 +217,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"تم إرسال طلب السحب #{wid}\n"
             f"الطريقة: {method_name}\n"
-            f"المبلغ: {amount} وحدة\n"
-            f"الرسوم: {fee} وحدة\n"
+            f"المبلغ: {amount} جنيه\n"
+            f"الرسوم: {fee} جنيه\n"
             f"في انتظار موافقة المشرف."
         )
         kb = [
@@ -230,7 +230,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"مستخدم: {user_id}\n"
             f"الطريقة: {method_name}\n"
             f"البيانات: {text}\n"
-            f"المبلغ: {amount} وحدة",
+            f"المبلغ: {amount} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -260,7 +260,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
         ]
         await send_photo_to_admins(context, file_id,
-            f"إثبات المهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} وحدة",
+            f"إثبات المهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -282,7 +282,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
         ]
         await send_photo_to_admins(context, file_id,
-            f"إثبات معاد للمهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} وحدة",
+            f"إثبات معاد للمهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -299,7 +299,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"تم قبول طلب السحب #{wid}.")
         await context.bot.send_photo(
             w["user_id"], file_id,
-            caption=f"تم تنفيذ طلب السحب #{wid}\nالمبلغ: {w['amount']} وحدة\nالطريقة: {w['method']}"
+            caption=f"تم تنفيذ طلب السحب #{wid}\nالمبلغ: {w['amount']} جنيه\nالطريقة: {w['method']}"
         )
         return
 

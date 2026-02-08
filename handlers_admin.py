@@ -71,7 +71,7 @@ async def admin_withdrawals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = "💸 طلبات السحب المعلقة:\n\n"
     for w in withdrawals[:20]:
-        msg += f"#{w['id']} | مستخدم: {w['user_id']} | {w['method']} | {w['amount']} وحدة\n"
+        msg += f"#{w['id']} | مستخدم: {w['user_id']} | {w['method']} | {w['amount']} جنيه\n"
         keyboard_w = [
             [InlineKeyboardButton("✅ قبول", callback_data=f"admin_approve_w_{w['id']}"),
              InlineKeyboardButton("❌ رفض", callback_data=f"admin_reject_w_{w['id']}")]
@@ -93,7 +93,7 @@ async def admin_withdrawals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 مستخدم: {w['user_id']}\n"
             f"📱 الطريقة: {w['method']}\n"
             f"📝 البيانات: {w['data']}\n"
-            f"💰 المبلغ: {w['amount']} وحدة",
+            f"💰 المبلغ: {w['amount']} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
 
@@ -143,9 +143,9 @@ async def admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 إدارة المستخدمين\n\n"
         f"📊 إجمالي المستخدمين: {total}\n"
         f"🟢 المستخدمين النشطين: {active}\n"
-        f"💰 إجمالي الرصيد المتاح: {balances['avail']} وحدة\n"
-        f"🔒 إجمالي الرصيد المحجوز: {balances['res']} وحدة\n"
-        f"👥 إجمالي رصيد الإحالات: {balances['ref']} وحدة"
+        f"💰 إجمالي الرصيد المتاح: {balances['avail']} جنيه\n"
+        f"🔒 إجمالي الرصيد المحجوز: {balances['res']} جنيه\n"
+        f"👥 إجمالي رصيد الإحالات: {balances['ref']} جنيه"
     )
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -187,7 +187,7 @@ async def admin_reserved(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = "🔒 المهام ذات الرصيد المحجوز:\n\n"
     for t in tasks[:20]:
-        msg += f"#{t['id']} | مستخدم: {t['user_id']} | {t['price']} وحدة | حتى: {t['reserved_until']}\n"
+        msg += f"#{t['id']} | مستخدم: {t['user_id']} | {t['price']} جنيه | حتى: {t['reserved_until']}\n"
 
     # Check if any are ready to release
     ready = db.get_tasks_ready_to_release()
@@ -199,7 +199,7 @@ async def admin_reserved(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 query.from_user.id,
                 f"⏰ المهمة #{t['id']} جاهزة للتحويل\n"
                 f"👤 مستخدم: {t['user_id']}\n"
-                f"💰 المبلغ: {t['price']} وحدة\n"
+                f"💰 المبلغ: {t['price']} جنيه\n"
                 f"هل تريد تحويل الرصيد للمتاح؟",
                 reply_markup=InlineKeyboardMarkup(kb)
             )
@@ -223,9 +223,9 @@ async def admin_release_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
     db.release_task(task_id)
     db.move_reserved_to_available(task["user_id"], task["price"])
 
-    await query.edit_message_text(f"✅ تم تحويل {task['price']} وحدة للرصيد المتاح للمستخدم {task['user_id']}.")
+    await query.edit_message_text(f"✅ تم تحويل {task['price']} جنيه للرصيد المتاح للمستخدم {task['user_id']}.")
     await context.bot.send_message(task["user_id"],
-        f"✅ تم تحويل {task['price']} وحدة من الرصيد المحجوز إلى الرصيد المتاح!"
+        f"✅ تم تحويل {task['price']} جنيه من الرصيد المحجوز إلى الرصيد المتاح!"
     )
 
 
@@ -244,9 +244,9 @@ async def admin_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = (
         f"⚙️ الإعدادات الحالية:\n\n"
-        f"💰 سعر المهمة: {task_price} وحدة\n"
-        f"👥 مكافأة الإحالة: {ref_reward} وحدة\n"
-        f"💸 الحد الأدنى للسحب: {min_w} وحدة\n"
+        f"💰 سعر المهمة: {task_price} جنيه\n"
+        f"👥 مكافأة الإحالة: {ref_reward} جنيه\n"
+        f"💸 الحد الأدنى للسحب: {min_w} جنيه\n"
         f"🤖 حالة البوت: {'🟢 نشط' if bot_active == '1' else '🔴 متوقف'}\n\n"
         f"📱 طرق السحب:\n"
     )

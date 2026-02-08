@@ -103,7 +103,7 @@ async def new_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         f"✅ تم طلب مهمة جديدة.\n"
-        f"💰 سعر المهمة: {price} وحدة\n"
+        f"💰 سعر المهمة: {price} جنيه\n"
         f"⏳ في انتظار بيانات المهمة من المشرف..."
     )
 
@@ -113,7 +113,7 @@ async def new_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📋 طلب مهمة جديدة\n"
         f"👤 المستخدم: {user_id}\n"
         f"🆔 Task ID: {task_id}\n"
-        f"💰 السعر: {price} وحدة\n\n"
+        f"💰 السعر: {price} جنيه\n\n"
         f"يرجى إرسال بيانات المهمة.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -189,7 +189,7 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text(f"✅ تمت الموافقة على المهمة #{task_id}.\nالرصيد أُضيف للرصيد المحجوز.")
     await context.bot.send_message(task["user_id"],
         f"✅ تمت الموافقة على المهمة #{task_id}!\n"
-        f"💰 تم إضافة {task['price']} وحدة للرصيد المحجوز.\n"
+        f"💰 تم إضافة {task['price']} جنيه للرصيد المحجوز.\n"
         f"⏳ سيتحول للرصيد المتاح بعد 48 ساعة."
     )
 
@@ -240,9 +240,9 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     msg = (
         f"🆔 ID: {user['id']}\n"
-        f"💰 رصيد متاح: {user['available']} وحدة\n"
-        f"🔒 رصيد محجوز: {user['reserved']} وحدة\n"
-        f"👥 رصيد الإحالات: {user['referral_balance']} وحدة\n\n"
+        f"💰 رصيد متاح: {user['available']} جنيه\n"
+        f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
+        f"👥 رصيد الإحالات: {user['referral_balance']} جنيه\n\n"
         f"⏳ الرصيد المحجوز يتحول لرصيد متاح بعد 48 ساعة."
     )
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -278,7 +278,7 @@ async def my_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         for t in tasks_list[:10]:
             status_text = status_map.get(t["status"], t["status"])
-            msg += f"  #{t['id']} - {t['price']} وحدة - {status_text}\n"
+            msg += f"  #{t['id']} - {t['price']} جنيه - {status_text}\n"
 
     keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -301,7 +301,7 @@ async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if total_available < min_withdrawal:
         keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
         await query.edit_message_text(
-            f"⚠️ رصيدك المتاح ({total_available} وحدة) أقل من الحد الأدنى للسحب ({min_withdrawal} وحدة).",
+            f"⚠️ رصيدك المتاح ({total_available} جنيه) أقل من الحد الأدنى للسحب ({min_withdrawal} جنيه).",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
@@ -316,7 +316,7 @@ async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard.append([InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")])
 
     await query.edit_message_text(
-        f"💸 رصيدك المتاح: {total_available} وحدة\nاختر طريقة السحب:",
+        f"💸 رصيدك المتاح: {total_available} جنيه\nاختر طريقة السحب:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -337,7 +337,7 @@ async def withdraw_method_selected(update: Update, context: ContextTypes.DEFAULT
     if user["available"] < method["min_amount"]:
         keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
         await query.edit_message_text(
-            f"⚠️ رصيدك ({user['available']}) أقل من الحد الأدنى لـ {method_name} ({method['min_amount']} وحدة).",
+            f"⚠️ رصيدك ({user['available']}) أقل من الحد الأدنى لـ {method_name} ({method['min_amount']} جنيه).",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
@@ -362,7 +362,7 @@ async def withdrawal_history(update: Update, context: ContextTypes.DEFAULT_TYPE)
     msg = "📜 سجل السحوبات:\n\n"
     for w in withdrawals[:15]:
         s = status_map.get(w["status"], w["status"])
-        msg += f"#{w['id']} | {w['method']} | {w['amount']} وحدة | {s}\n"
+        msg += f"#{w['id']} | {w['method']} | {w['amount']} جنيه | {s}\n"
 
     keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -392,8 +392,8 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔗 رابط الدعوة الخاص بك:\n{invite_link}\n\n"
         f"👤 عدد الإحالات: {ref_count}\n"
         f"📋 مهام المُحالين المكتملة: {ref_tasks}\n"
-        f"💰 رصيد الإحالات: {user['referral_balance']} وحدة\n"
-        f"🎁 مكافأة لكل مهمة يعملها المُحال: {ref_reward} وحدة"
+        f"💰 رصيد الإحالات: {user['referral_balance']} جنيه\n"
+        f"🎁 مكافأة لكل مهمة يعملها المُحال: {ref_reward} جنيه"
     )
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -437,7 +437,7 @@ async def withdraw_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.update_user_balance(user_id, referral_balance=0)
 
     await query.edit_message_text(
-        f"✅ تم تحويل {amount} وحدة من رصيد الإحالات إلى الرصيد المتاح.\n"
+        f"✅ تم تحويل {amount} جنيه من رصيد الإحالات إلى الرصيد المتاح.\n"
         f"يمكنك سحبه من قائمة سحب الأرباح.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]])
     )
