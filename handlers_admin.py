@@ -21,6 +21,8 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🔍 بحث عن مستخدم", callback_data="admin_search_user")],
         [InlineKeyboardButton("🗑️ مسح رصيد مستخدم", callback_data="admin_clear_balance")],
         [InlineKeyboardButton("❌ إلغاء مهمة", callback_data="admin_cancel_task")],
+        [InlineKeyboardButton("🎁 المكافأة", callback_data="admin_reward_user")],
+        [InlineKeyboardButton("🚫 حظر/رفع حظر مستخدم", callback_data="admin_ban_user")],
         [InlineKeyboardButton("👮 إدارة المشرفين", callback_data="admin_manage_admins")],
         [InlineKeyboardButton("🎬 تحديد فيديو الشرح", callback_data="admin_set_video")],
         [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")],
@@ -397,8 +399,30 @@ async def admin_cancel_task_prompt(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     if not is_admin(query.from_user.id):
         return
-    context.user_data["admin_cancelling_task"] = True
-    await query.edit_message_text("❌ أرسل رقم المهمة لإلغائها:")
+    
+    # Get incomplete tasks
+    tasks = db.get_incomplete_tasks()
+    if not tasks:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text("✅ لا توجد مهام غير مكتملة.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    msg = "❌ المهام الغير مكتملة:\n\n"
+    keyboard = []
+    for t in tasks[:15]:
+        status_map = {
+            "pending": "⏳ معلقة",
+            "data_sent": "📤 بيانات مرسلة",
+            "proof_submitted": "📸 إثبات مرسل",
+            "error": "⚠️ خطأ",
+            "error_resubmitted": "📸 إثبات معاد",
+        }
+        status = status_map.get(t["status"], t["status"])
+        msg += f"#{t['id']} | مستخدم: {t['user_id']} | {status}\n"
+        keyboard.append([InlineKeyboardButton(f"❌ إلغاء المهمة #{t['id']}", callback_data=f"admin_do_cancel_{t['id']}")])
+    
+    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 # ==================== ADMIN MANAGE ADMINS ====================
@@ -448,3 +472,75 @@ async def admin_set_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     context.user_data["admin_setting_video"] = True
     await query.edit_message_text("🎬 أرسل فيديو الشرح الآن:")
+
+
+
+# ==================== ADMIN DO CANCEL TASK ====================
+async def admin_do_cancel_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    task_id = int(query.data.split("_")[-1])
+    task = db.get_task(task_id)
+    if task:
+        db.cancel_task(task_id)
+        await query.edit_message_text(f"✅ تم إلغاء المهمة #{task_id}.")
+        await context.bot.send_message(task["user_id"], f"❌ تم إلغاء المهمة #{task_id} بواسطة المشرف.")
+    else:
+        await query.edit_message_text("⚠️ المهمة غير موجودة.")
+
+
+# ==================== ADMIN REWARD USER ====================
+async def admin_reward_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    context.user_data["admin_rewarding_user_step"] = "id"
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text("🎁 أرسل ID المستخدم:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+# ==================== ADMIN BAN USER ====================
+async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    context.user_data["admin_banning_user"] = True
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text("🚫 أرسل ID المستخدم للحظر أو رفع الحظر:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+# ==================== ADMIN TOGGLE BOT WITH NOTIFICATION ====================
+async def admin_toggle_bot_with_notification(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+
+    current = db.get_setting("bot_active")
+    new_val = "0" if current == "1" else "1"
+    db.set_setting("bot_active", new_val)
+    status = "🟢 نشط" if new_val == "1" else "🔴 متوقف"
+    
+    # Send notification to all users
+    user_ids = db.get_all_user_ids()
+    if new_val == "1":
+        msg = "🟢 البوت الآن نشط! يمكنك طلب المهام."
+    else:
+        msg = "🔴 البوت متوقف مؤقتاً. سيتم إعلامك عند التشغيل."
+    
+    sent_count = 0
+    for uid in user_ids:
+        try:
+            await context.bot.send_message(uid, msg)
+            sent_count += 1
+        except Exception:
+            pass
+    
+    await query.answer(f"تم تغيير حالة البوت إلى: {status}\nتم إرسال الإشعار لـ {sent_count} مستخدم", show_alert=True)
+    # Refresh settings page
+    await admin_settings(update, context)

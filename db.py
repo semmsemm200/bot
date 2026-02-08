@@ -16,6 +16,7 @@ def init_db():
             reserved INTEGER DEFAULT 0,
             referral_balance INTEGER DEFAULT 0,
             referrer_id INTEGER DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -403,3 +404,33 @@ def update_withdrawal_method_min(name, min_amount):
 def update_withdrawal_method_fee(name, fee):
     cursor.execute("UPDATE withdrawal_methods SET fee=? WHERE name=?", (fee, name))
     conn.commit()
+
+
+# ---- Ban/Unban Users ----
+def ban_user(user_id):
+    cursor.execute("UPDATE users SET is_banned=1 WHERE id=?", (user_id,))
+    conn.commit()
+
+
+def unban_user(user_id):
+    cursor.execute("UPDATE users SET is_banned=0 WHERE id=?", (user_id,))
+    conn.commit()
+
+
+def is_user_banned(user_id):
+    cursor.execute("SELECT is_banned FROM users WHERE id=?", (user_id,))
+    row = cursor.fetchone()
+    return row["is_banned"] == 1 if row else False
+
+
+# ---- Get all user IDs ----
+def get_all_user_ids():
+    cursor.execute("SELECT id FROM users")
+    return [row["id"] for row in cursor.fetchall()]
+
+
+# ---- Get incomplete tasks ----
+def get_incomplete_tasks():
+    """Tasks that are not completed (pending, data_sent, proof_submitted, error, error_resubmitted)"""
+    cursor.execute("SELECT * FROM tasks WHERE status IN ('pending', 'data_sent', 'proof_submitted', 'error', 'error_resubmitted') ORDER BY created_at DESC")
+    return cursor.fetchall()

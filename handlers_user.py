@@ -12,6 +12,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or update.effective_user.first_name
 
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await update.message.reply_text("⛔ تم حظرك من استخدام البوت.")
+        return
+
     # Handle referral link: /start ref_12345
     referrer_id = 0
     if context.args and context.args[0].startswith("ref_"):
@@ -22,20 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             referrer_id = 0
 
-    # Check channel membership
-    is_member = await check_channel_member(context.bot, user_id)
-    if not is_member:
-        keyboard = [[InlineKeyboardButton("📢 انضم للقناة", url=CHANNEL_LINK)],
-                     [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_sub")]]
-        await update.message.reply_text(
-            "⚠️ يجب عليك الانضمام لقناة البوت أولاً للاستخدام.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        # Save referrer in context for later
-        context.user_data["pending_referrer"] = referrer_id
-        return
-
-    # Register user
+    # Register user (removed channel check)
     db.add_user(user_id, username, referrer_id)
     if referrer_id and referrer_id != user_id:
         referrer = db.get_user(referrer_id)
@@ -47,15 +39,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # This function is no longer needed but kept for compatibility
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     username = query.from_user.username or query.from_user.first_name
-
-    is_member = await check_channel_member(context.bot, user_id)
-    if not is_member:
-        await query.answer("❌ لم تنضم للقناة بعد!", show_alert=True)
-        return
 
     referrer_id = context.user_data.get("pending_referrer", 0)
     db.add_user(user_id, username, referrer_id)
@@ -71,13 +59,12 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ==================== MENU ====================
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    is_member = await check_channel_member(context.bot, user_id)
-    if not is_member:
-        keyboard = [[InlineKeyboardButton("📢 انضم للقناة", url=CHANNEL_LINK)],
-                     [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_sub")]]
-        await update.message.reply_text("⚠️ يجب عليك الانضمام لقناة البوت أولاً.",
-                                        reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await update.message.reply_text("⛔ تم حظرك من استخدام البوت.")
         return
+    
     await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
 
 
@@ -94,17 +81,25 @@ async def new_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
 
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await query.edit_message_text("⛔ تم حظرك من استخدام البوت.")
+        return
+
     if not bot_is_active():
-        await query.edit_message_text("⚠️ البوت متوقف حالياً. يرجى المحاولة لاحقاً.")
+        keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
+        await query.edit_message_text("⚠️ البوت متوقف حالياً. يرجى المحاولة لاحقاً.", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     price = int(db.get_setting("task_price") or 10)
     task_id = db.create_task(user_id, price)
 
+    keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
     await query.edit_message_text(
         f"✅ تم طلب مهمة جديدة.\n"
         f"💰 سعر المهمة: {price} جنيه\n"
-        f"⏳ في انتظار بيانات المهمة من المشرف..."
+        f"⏳ في انتظار بيانات المهمة من المشرف...",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
     # Notify admins
@@ -235,7 +230,8 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     user = db.get_user(user_id)
     if not user:
-        await query.edit_message_text("⚠️ لم يتم العثور على حسابك.")
+        keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")]]
+        await query.edit_message_text("⚠️ لم يتم العثور على حسابك.", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     keyboard = [

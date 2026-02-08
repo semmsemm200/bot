@@ -17,8 +17,9 @@ from handlers_admin import (
     admin_set_task_price, admin_set_ref_reward, admin_set_min_w,
     admin_set_fees, admin_edit_method, admin_method_min, admin_method_fee,
     admin_add_method, admin_search_user, admin_clear_balance,
-    admin_cancel_task_prompt, admin_manage_admins,
-    admin_add_admin, admin_remove_admin, admin_set_video
+    admin_cancel_task_prompt, admin_do_cancel_task, admin_manage_admins,
+    admin_add_admin, admin_remove_admin, admin_set_video,
+    admin_reward_user, admin_ban_user, admin_toggle_bot_with_notification
 )
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -172,6 +173,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("المهمة غير موجودة.")
         except ValueError:
             await update.message.reply_text("يرجى إرسال رقم صحيح.")
+        return
+
+    # Admin: reward user - step 1: get ID
+    if context.user_data.get("admin_rewarding_user_step") == "id" and is_admin(user_id):
+        try:
+            target_id = int(text)
+            user = db.get_user(target_id)
+            if user:
+                context.user_data["admin_rewarding_user_id"] = target_id
+                context.user_data["admin_rewarding_user_step"] = "amount"
+                await update.message.reply_text(
+                    f"👤 المستخدم: {user['username'] or target_id}\n"
+                    f"💰 الرصيد الحالي: {user['available']} جنيه\n\n"
+                    f"أرسل مبلغ المكافأة:"
+                )
+            else:
+                await update.message.reply_text("المستخدم غير موجود.")
+                context.user_data.pop("admin_rewarding_user_step", None)
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
+        return
+
+    # Admin: reward user - step 2: get amount
+    if context.user_data.get("admin_rewarding_user_step") == "amount" and is_admin(user_id):
+        try:
+            amount = int(text)
+            target_id = context.user_data.pop("admin_rewarding_user_id")
+            context.user_data.pop("admin_rewarding_user_step")
+            
+            db.add_to_available(target_id, amount)
+            await update.message.reply_text(f"✅ تم إضافة {amount} جنيه للمستخدم {target_id}.")
+            await context.bot.send_message(target_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم صحيح.")
+            context.user_data.pop("admin_rewarding_user_step", None)
+            context.user_data.pop("admin_rewarding_user_id", None)
+        return
+
+    # Admin: ban/unban user
+    if context.user_data.get("admin_banning_user") and is_admin(user_id):
+        context.user_data.pop("admin_banning_user")
+        try:
+            target_id = int(text)
+            user = db.get_user(target_id)
+            if user:
+                if db.is_user_banned(target_id):
+                    db.unban_user(target_id)
+                    await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {target_id}.")
+                    await context.bot.send_message(target_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
+                else:
+                    db.ban_user(target_id)
+                    await update.message.reply_text(f"🚫 تم حظر المستخدم {target_id}.")
+                    await context.bot.send_message(target_id, "⛔ تم حظرك من استخدام البوت.")
+            else:
+                await update.message.reply_text("المستخدم غير موجود.")
+        except ValueError:
+            await update.message.reply_text("يرجى إرسال رقم ID صحيح.")
         return
 
     # Admin: add admin
@@ -387,7 +445,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_settings":
         await admin_settings(update, context)
     elif data == "admin_toggle_bot":
-        await admin_toggle_bot(update, context)
+        await admin_toggle_bot_with_notification(update, context)
     elif data == "admin_set_task_price":
         await admin_set_task_price(update, context)
     elif data == "admin_set_ref_reward":
@@ -410,6 +468,12 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_clear_balance(update, context)
     elif data == "admin_cancel_task":
         await admin_cancel_task_prompt(update, context)
+    elif data.startswith("admin_do_cancel_"):
+        await admin_do_cancel_task(update, context)
+    elif data == "admin_reward_user":
+        await admin_reward_user(update, context)
+    elif data == "admin_ban_user":
+        await admin_ban_user(update, context)
     elif data == "admin_manage_admins":
         await admin_manage_admins(update, context)
     elif data == "admin_add_admin":
