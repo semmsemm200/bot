@@ -396,12 +396,12 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_set_min_w(update, context)
     elif data == "admin_set_fees":
         await admin_set_fees(update, context)
-    elif data.startswith("admin_edit_method_"):
-        await admin_edit_method(update, context)
     elif data.startswith("admin_method_min_"):
         await admin_method_min(update, context)
     elif data.startswith("admin_method_fee_"):
         await admin_method_fee(update, context)
+    elif data.startswith("admin_edit_method_"):
+        await admin_edit_method(update, context)
     elif data == "admin_add_method":
         await admin_add_method(update, context)
     elif data == "admin_search_user":
@@ -424,6 +424,11 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== MAIN ====================
 def main():
+    if not TOKEN:
+        print("ERROR: TELEGRAM_BOT_TOKEN environment variable is not set!")
+        print("Set it with: export TELEGRAM_BOT_TOKEN=your_token_here")
+        return
+
     db.init_db()
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
