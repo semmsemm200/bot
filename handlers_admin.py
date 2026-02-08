@@ -13,18 +13,18 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton("📋 المهام المعلقة", callback_data="admin_pending_tasks")],
-        [InlineKeyboardButton("💸 طلبات السحب", callback_data="admin_withdrawals")],
-        [InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="admin_users")],
-        [InlineKeyboardButton("🔒 الرصيد المحجوز", callback_data="admin_reserved")],
-        [InlineKeyboardButton("⚙️ الإعدادات", callback_data="admin_settings")],
-        [InlineKeyboardButton("🔍 بحث عن مستخدم", callback_data="admin_search_user")],
-        [InlineKeyboardButton("🗑️ مسح رصيد مستخدم", callback_data="admin_clear_balance")],
-        [InlineKeyboardButton("❌ إلغاء مهمة", callback_data="admin_cancel_task")],
-        [InlineKeyboardButton("🎁 المكافأة", callback_data="admin_reward_user")],
-        [InlineKeyboardButton("🚫 حظر/رفع حظر مستخدم", callback_data="admin_ban_user")],
-        [InlineKeyboardButton("👮 إدارة المشرفين", callback_data="admin_manage_admins")],
-        [InlineKeyboardButton("🎬 تحديد فيديو الشرح", callback_data="admin_set_video")],
+        [InlineKeyboardButton("📋 المهام المعلقة", callback_data="admin_pending_tasks"),
+         InlineKeyboardButton("💸 طلبات السحب", callback_data="admin_withdrawals")],
+        [InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="admin_users"),
+         InlineKeyboardButton("🔒 الرصيد المحجوز", callback_data="admin_reserved")],
+        [InlineKeyboardButton("⚙️ الإعدادات", callback_data="admin_settings"),
+         InlineKeyboardButton("🔍 بحث عن مستخدم", callback_data="admin_search_user")],
+        [InlineKeyboardButton("🗑️ مسح رصيد مستخدم", callback_data="admin_clear_balance"),
+         InlineKeyboardButton("❌ إلغاء مهمة", callback_data="admin_cancel_task")],
+        [InlineKeyboardButton("🎁 المكافأة", callback_data="admin_reward_user"),
+         InlineKeyboardButton("🚫 حظر/رفع حظر", callback_data="admin_ban_user")],
+        [InlineKeyboardButton("👮 إدارة المشرفين", callback_data="admin_manage_admins"),
+         InlineKeyboardButton("🎬 فيديو الشرح", callback_data="admin_set_video")],
         [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")],
     ]
     await query.edit_message_text("🔧 لوحة الإدارة:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -263,16 +263,18 @@ async def admin_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"  - {m['name']}: حد أدنى {m['min_amount']} | رسوم {m['fee']}\n"
 
     keyboard = [
-        [InlineKeyboardButton("💰 تغيير سعر المهمة", callback_data="admin_set_task_price")],
-        [InlineKeyboardButton("👥 تغيير مكافأة الإحالة", callback_data="admin_set_ref_reward")],
-        [InlineKeyboardButton("💸 تغيير الحد الأدنى للسحب", callback_data="admin_set_min_w")],
-        [InlineKeyboardButton("📱 رسوم طرق السحب", callback_data="admin_set_fees")],
-        [InlineKeyboardButton("➕ إضافة طريقة سحب", callback_data="admin_add_method")],
-        [InlineKeyboardButton(
+    keyboard = [
+        [InlineKeyboardButton("💰 تغيير سعر المهمة", callback_data="admin_set_task_price"),
+         InlineKeyboardButton("👥 مكافأة الإحالة", callback_data="admin_set_ref_reward")],
+        [InlineKeyboardButton("💸 الحد الأدنى للسحب", callback_data="admin_set_min_w"),
+         InlineKeyboardButton("📱 رسوم طرق السحب", callback_data="admin_set_fees")],
+        [InlineKeyboardButton("➕ إضافة طريقة سحب", callback_data="admin_add_method"),
+         InlineKeyboardButton(
             "🔴 إيقاف البوت" if bot_active == "1" else "🟢 تشغيل البوت",
             callback_data="admin_toggle_bot"
         )],
         [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")],
+    ]
     ]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -637,8 +639,8 @@ async def admin_manage_admins(update: Update, context: ContextTypes.DEFAULT_TYPE
             msg += f"🆔 {a}\n"
 
     keyboard = [
-        [InlineKeyboardButton("➕ إضافة مشرف", callback_data="admin_add_admin")],
-        [InlineKeyboardButton("➖ إزالة مشرف", callback_data="admin_remove_admin")],
+        [InlineKeyboardButton("➕ إضافة مشرف", callback_data="admin_add_admin"),
+         InlineKeyboardButton("➖ إزالة مشرف", callback_data="admin_remove_admin")],
         [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")],
     ]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))

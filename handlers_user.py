@@ -397,8 +397,8 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     invite_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
 
     keyboard = [
-        [InlineKeyboardButton("🏆 تصنيف الإحالات", callback_data="leaderboard")],
-        [InlineKeyboardButton("💸 سحب رصيد الإحالات", callback_data="withdraw_referral")],
+        [InlineKeyboardButton("🏆 تصنيف الإحالات", callback_data="leaderboard"),
+         InlineKeyboardButton("💸 سحب رصيد الإحالات", callback_data="withdraw_referral")],
         [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")],
     ]
 

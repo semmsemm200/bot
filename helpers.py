@@ -47,13 +47,14 @@ def bot_is_active():
 
 def get_main_menu_keyboard(user_id):
     keyboard = [
-        [InlineKeyboardButton("📋 طلب مهمة جديدة", callback_data="new_task")],
-        [InlineKeyboardButton("💰 رصيدي", callback_data="balance")],
-        [InlineKeyboardButton("📊 مهامي", callback_data="my_tasks")],
-        [InlineKeyboardButton("💸 سحب الأرباح", callback_data="withdraw")],
-        [InlineKeyboardButton("👥 الإحالات", callback_data="referrals")],
-        [InlineKeyboardButton("ℹ️ مساعدة", callback_data="help")],
-        [InlineKeyboardButton("🎬 فيديو الشرح", callback_data="tutorial")],
+        [InlineKeyboardButton("📋 طلب مهمة جديدة", callback_data="new_task"),
+         InlineKeyboardButton("💰 رصيدي", callback_data="balance")],
+        [InlineKeyboardButton("📊 مهامي", callback_data="my_tasks"),
+         InlineKeyboardButton("💸 سحب الأرباح", callback_data="withdraw")],
+        [InlineKeyboardButton("👥 الإحالات", callback_data="referrals"),
+         InlineKeyboardButton("💎 سحب رصيد الإحالات", callback_data="withdraw_referral")],
+        [InlineKeyboardButton("🎬 طريقة عمل المهمة", callback_data="tutorial"),
+         InlineKeyboardButton("ℹ️ مساعدة", callback_data="help")],
     ]
     if is_admin(user_id):
         keyboard.append([InlineKeyboardButton("🔧 لوحة الإدارة", callback_data="admin_panel")])
