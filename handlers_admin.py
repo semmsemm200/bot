@@ -5,6 +5,29 @@ from config import ADMIN_ID
 from helpers import is_admin, send_to_admins
 
 
+# Helper function to get user display name
+def get_user_display_name(user):
+    """Get user display name from user dict, handling missing columns"""
+    display_name = None
+    try:
+        first_name = user['first_name'] if 'first_name' in user.keys() else None
+        last_name = user['last_name'] if 'last_name' in user.keys() else None
+        
+        if first_name:
+            display_name = first_name
+            if last_name:
+                display_name += f" {last_name}"
+    except (KeyError, TypeError):
+        pass
+    
+    # Fallback to username or ID
+    if not display_name:
+        username = user.get('username', None)
+        display_name = username if username else str(user.get('id', 'غير معروف'))
+    
+    return display_name
+
+
 # ==================== ADMIN PANEL ====================
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -188,26 +211,22 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = "📋 بيانات المستخدمين:\n\n"
         for u in users[:30]:
             try:
-                ref_count = db.get_referral_count(u["id"])
+                user_id = u.get('id', 0)
+                username = u.get('username', None)
+                available = u.get('available', 0)
+                reserved = u.get('reserved', 0)
+                referral_balance = u.get('referral_balance', 0)
                 
-                # Build display name - handle None values safely
-                first_name = u.get('first_name') if u.get('first_name') else (u.get('username') if u.get('username') else str(u['id']))
-                last_name = u.get('last_name') if u.get('last_name') else ""
-                
-                display_name = first_name
-                if last_name:
-                    display_name += f" {last_name}"
-                
-                username_display = f"@{u['username']}" if u.get('username') else "لا يوجد"
+                ref_count = db.get_referral_count(user_id)
+                display_name = get_user_display_name(u)
+                username_display = f"@{username}" if username else "لا يوجد"
                 
                 msg += (
                     f"👤 {display_name}\n"
-                    f"🆔 ID: {u['id']} | 📱 {username_display}\n"
-                    f"💰 متاح: {u['available']} | 🔒 محجوز: {u['reserved']} | 👥 إحالات: {u['referral_balance']} | عدد: {ref_count}\n\n"
+                    f"🆔 ID: {user_id} | 📱 {username_display}\n"
+                    f"💰 متاح: {available} | 🔒 محجوز: {reserved} | 👥 إحالات: {referral_balance} | عدد: {ref_count}\n\n"
                 )
-            except Exception as e:
-                # Skip this user if there's an error
-                msg += f"⚠️ خطأ في قراءة بيانات المستخدم {u.get('id', 'غير معروف')}\n\n"
+            except Exception:
                 continue
 
         if len(msg) > 4000:
@@ -575,18 +594,13 @@ async def admin_view_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ref_count = db.get_referral_count(user_id)
         stats = db.get_user_task_stats(user_id)
         
-        # Build display name
-        display_name = ""
-        if user.get('first_name'):
-            display_name = user['first_name']
-            if user.get('last_name'):
-                display_name += f" {user['last_name']}"
-        
-        username_display = f"@{user['username']}" if user.get('username') else "لا يوجد"
+        display_name = get_user_display_name(user)
+        username = user.get('username', None)
+        username_display = f"@{username}" if username else "لا يوجد"
         
         msg = (
             f"بيانات المستخدم:\n\n"
-            f"👤 الاسم: {display_name or 'غير معروف'}\n"
+            f"👤 الاسم: {display_name}\n"
             f"📱 اليوزر: {username_display}\n"
             f"🆔 ID: {user['id']}\n"
             f"💰 رصيد متاح: {user['available']}\n"
