@@ -16,6 +16,7 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    conn.autocommit = False  # Ensure we control transactions
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     DB_TYPE = 'postgresql'
 else:
@@ -28,53 +29,68 @@ else:
 
 def execute_query(query, params=None):
     """Execute query with proper placeholder conversion for PostgreSQL/SQLite"""
-    if DB_TYPE == 'postgresql' and params:
-        # Convert ? to %s for PostgreSQL
-        query = query.replace('?', '%s')
-    cursor.execute(query, params or ())
+    try:
+        if DB_TYPE == 'postgresql' and params:
+            # Convert ? to %s for PostgreSQL
+            query = query.replace('?', '%s')
+        cursor.execute(query, params or ())
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()  # Rollback on error
+        raise e
 
 
 def execute_insert_or_replace(table, key_col, key_val, data_dict):
     """Insert or replace/update a row"""
-    cols = ', '.join(data_dict.keys())
-    placeholders = ', '.join(['?' for _ in data_dict])
-    values = tuple(data_dict.values())
-    
-    if DB_TYPE == 'postgresql':
-        # PostgreSQL: ON CONFLICT DO UPDATE
-        updates = ', '.join([f"{k} = EXCLUDED.{k}" for k in data_dict.keys() if k != key_col])
-        query = f"""
-            INSERT INTO {table} ({cols}) VALUES ({placeholders})
-            ON CONFLICT ({key_col}) DO UPDATE SET {updates}
-        """
-        query = query.replace('?', '%s')
-    else:
-        # SQLite: INSERT OR REPLACE
-        query = f"INSERT OR REPLACE INTO {table} ({cols}) VALUES ({placeholders})"
-    
-    cursor.execute(query, values)
-    conn.commit()
+    try:
+        cols = ', '.join(data_dict.keys())
+        placeholders = ', '.join(['?' for _ in data_dict])
+        values = tuple(data_dict.values())
+        
+        if DB_TYPE == 'postgresql':
+            # PostgreSQL: ON CONFLICT DO UPDATE
+            updates = ', '.join([f"{k} = EXCLUDED.{k}" for k in data_dict.keys() if k != key_col])
+            query = f"""
+                INSERT INTO {table} ({cols}) VALUES ({placeholders})
+                ON CONFLICT ({key_col}) DO UPDATE SET {updates}
+            """
+            query = query.replace('?', '%s')
+        else:
+            # SQLite: INSERT OR REPLACE
+            query = f"INSERT OR REPLACE INTO {table} ({cols}) VALUES ({placeholders})"
+        
+        cursor.execute(query, values)
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        raise e
 
 
 def execute_insert_or_ignore(table, data_dict):
     """Insert or ignore if exists"""
-    cols = ', '.join(data_dict.keys())
-    placeholders = ', '.join(['?' for _ in data_dict])
-    values = tuple(data_dict.values())
-    
-    if DB_TYPE == 'postgresql':
-        # Get primary key column (assume first column)
-        first_col = list(data_dict.keys())[0]
-        query = f"""
-            INSERT INTO {table} ({cols}) VALUES ({placeholders})
-            ON CONFLICT ({first_col}) DO NOTHING
-        """
-        query = query.replace('?', '%s')
-    else:
-        query = f"INSERT OR IGNORE INTO {table} ({cols}) VALUES ({placeholders})"
-    
-    cursor.execute(query, values)
-    conn.commit()
+    try:
+        cols = ', '.join(data_dict.keys())
+        placeholders = ', '.join(['?' for _ in data_dict])
+        values = tuple(data_dict.values())
+        
+        if DB_TYPE == 'postgresql':
+            # Get primary key column (assume first column)
+            first_col = list(data_dict.keys())[0]
+            query = f"""
+                INSERT INTO {table} ({cols}) VALUES ({placeholders})
+                ON CONFLICT ({first_col}) DO NOTHING
+            """
+            query = query.replace('?', '%s')
+        else:
+            query = f"INSERT OR IGNORE INTO {table} ({cols}) VALUES ({placeholders})"
+        
+        cursor.execute(query, values)
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        raise e
 
 
 def init_db():
@@ -305,6 +321,7 @@ def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
                     first_name = EXCLUDED.first_name,
                     last_name = EXCLUDED.last_name
             """, (user_id, username, first_name, last_name, referrer_id))
+            conn.commit()
         else:
             cursor.execute(
                 "INSERT OR IGNORE INTO users (id, username, first_name, last_name, referrer_id) VALUES (?, ?, ?, ?, ?)",
@@ -315,23 +332,33 @@ def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
                 "UPDATE users SET username=?, first_name=?, last_name=? WHERE id=?",
                 (username, first_name, last_name, user_id)
             )
-    except Exception:
-        # Fallback to old schema without first_name and last_name
+            conn.commit()
+    except Exception as e:
         if DB_TYPE == 'postgresql':
-            execute_query("""
-                INSERT INTO users (id, username, referrer_id) VALUES (?, ?, ?)
-                ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
-            """, (user_id, username, referrer_id))
-        else:
-            cursor.execute(
-                "INSERT OR IGNORE INTO users (id, username, referrer_id) VALUES (?, ?, ?)",
-                (user_id, username, referrer_id)
-            )
-            # Update existing user
-            cursor.execute(
-                "UPDATE users SET username=? WHERE id=?",
-                (username, user_id)
-            )
+            conn.rollback()
+        # Fallback to old schema without first_name and last_name
+        try:
+            if DB_TYPE == 'postgresql':
+                execute_query("""
+                    INSERT INTO users (id, username, referrer_id) VALUES (?, ?, ?)
+                    ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+                """, (user_id, username, referrer_id))
+                conn.commit()
+            else:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO users (id, username, referrer_id) VALUES (?, ?, ?)",
+                    (user_id, username, referrer_id)
+                )
+                # Update existing user
+                cursor.execute(
+                    "UPDATE users SET username=? WHERE id=?",
+                    (username, user_id)
+                )
+                conn.commit()
+        except Exception as e2:
+            if DB_TYPE == 'postgresql':
+                conn.rollback()
+            print(f"Error adding user: {e2}")
     conn.commit()
 
 
