@@ -102,18 +102,20 @@ async def admin_withdrawals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_approve_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("✅ تم قبول الطلب، أرسل الآن صورة الإيصال", show_alert=True)
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
 
     wid = int(query.data.split("_")[-1])
     context.user_data["admin_approve_withdrawal_id"] = wid
+    await query.answer("✅ تم قبول الطلب، أرسل الآن صورة الإيصال", show_alert=True)
     await query.edit_message_text(f"📸 أرسل سكرين شوت إثبات السحب #{wid}:")
 
 
 async def admin_reject_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
 
     wid = int(query.data.split("_")[-1])
@@ -123,13 +125,24 @@ async def admin_reject_withdrawal(update: Update, context: ContextTypes.DEFAULT_
     if w:
         try:
             await context.bot.send_message(w["user_id"], f"❌ تم رفض طلب السحب #{wid}.\nتم إرجاع الرصيد لحسابك.")
-            await query.answer("❌ تم رفض الطلب وإرجاع الرصيد وتم إرسال الإشعار", show_alert=True)
+            await query.answer(
+                f"❌ تم رفض طلب السحب\n"
+                f"🆔 الطلب: #{wid}\n"
+                f"👤 المستخدم: {w['user_id']}\n"
+                f"💰 المبلغ: {w['amount']} جنيه",
+                show_alert=True
+            )
         except Exception as e:
             await query.answer(f"❌ تم الرفض لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
     else:
         await query.answer("❌ تم رفض الطلب", show_alert=True)
     
-    await query.edit_message_text(f"❌ تم رفض طلب السحب #{wid}. تم إرجاع الرصيد للمستخدم.")
+    await query.edit_message_text(
+        f"❌ تم رفض طلب السحب بنجاح\n"
+        f"🆔 الطلب: #{wid}\n"
+        f"👤 المستخدم: {w['user_id'] if w else 'غير معروف'}\n"
+        f"تم إرجاع الرصيد للمستخدم."
+    )
 
 
 # ==================== ADMIN USERS ====================

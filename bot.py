@@ -59,7 +59,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"بيانات المهمة #{task_id}:\n\n{text}\n\nسعر المهمة: {task['price']} جنيه",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-            await update.message.reply_text(f"✅ تم إرسال بيانات المهمة #{task_id} للمستخدم بنجاح.")
+            await update.message.reply_text(
+                f"✅ تم إرسال البيانات بنجاح\n"
+                f"🆔 المهمة: #{task_id}\n"
+                f"👤 المستخدم: {task['user_id']}"
+            )
         except Exception as e:
             await update.message.reply_text(f"⚠️ تعذر إرسال البيانات للمستخدم: {str(e)}")
         return
@@ -69,7 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = context.user_data.pop("admin_error_task_id")
         task = db.get_task(task_id)
         if not task:
-            await update.message.reply_text("المهمة غير موجودة.")
+            await update.message.reply_text("❌ المهمة غير موجودة.")
             return
         db.set_task_error(task_id, text)
         try:
@@ -81,7 +85,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "resubmit_tasks" not in context.bot_data:
                 context.bot_data["resubmit_tasks"] = {}
             context.bot_data["resubmit_tasks"][str(task["user_id"])] = task_id
-            await update.message.reply_text(f"✅ تم إرسال ملاحظة الخطأ للمستخدم بنجاح.")
+            await update.message.reply_text(
+                f"✅ تم إرسال الخطأ بنجاح\n"
+                f"🆔 المهمة: #{task_id}\n"
+                f"👤 المستخدم: {task['user_id']}"
+            )
         except Exception as e:
             await update.message.reply_text(f"⚠️ تم حفظ الخطأ لكن تعذر إرسال الإشعار: {str(e)}")
         return
@@ -208,7 +216,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 w["user_id"], file_id,
                 caption=f"✅ تم تنفيذ طلب السحب #{wid}\n💰 المبلغ: {w['amount']} جنيه\n📱 الطريقة: {w['method']}"
             )
-            await update.message.reply_text(f"✅ تم قبول طلب السحب #{wid} وتم إرسال الإيصال للمستخدم بنجاح.")
+            await update.message.reply_text(
+                f"✅ تم قبول طلب السحب بنجاح\n"
+                f"🆔 الطلب: #{wid}\n"
+                f"👤 المستخدم: {w['user_id']}\n"
+                f"💰 المبلغ: {w['amount']} جنيه"
+            )
         except Exception as e:
             await update.message.reply_text(f"✅ تم قبول الطلب لكن تعذر إرسال الإيصال: {str(e)}")
         return

@@ -162,17 +162,19 @@ async def task_how_to(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== TASK: Admin approves proof ====================
 async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
 
     task_id = int(query.data.split("_")[-1])
     task = db.get_task(task_id)
     if not task:
+        await query.answer("❌ المهمة غير موجودة", show_alert=True)
         await query.edit_message_text("❌ المهمة غير موجودة.")
         return
 
     if task["status"] in ("approved", "released", "rejected", "cancelled"):
+        await query.answer(f"⚠️ المهمة #{task_id} تم التعامل معها بالفعل", show_alert=True)
         await query.edit_message_text(f"⚠️ المهمة #{task_id} تم التعامل معها بالفعل.")
         return
 
@@ -193,18 +195,30 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"💰 تم إضافة {task['price']} جنيه للرصيد المحجوز.\n"
             f"⏳ سيتحول للرصيد المتاح بعد 48 ساعة."
         )
-        await query.answer("✅ تمت الموافقة على المهمة وتم إرسال الإشعار للمستخدم", show_alert=True)
+        await query.answer(
+            f"✅ تمت الموافقة على المهمة\n"
+            f"🆔 المهمة: #{task_id}\n"
+            f"👤 المستخدم: {task['user_id']}\n"
+            f"💰 المبلغ: {task['price']} جنيه",
+            show_alert=True
+        )
     except Exception as e:
         await query.answer(f"✅ تمت الموافقة لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
     
-    await query.edit_message_text(f"✅ تمت الموافقة على المهمة #{task_id}.\nالرصيد أُضيف للرصيد المحجوز.")
+    await query.edit_message_text(
+        f"✅ تمت الموافقة على المهمة بنجاح\n"
+        f"🆔 المهمة: #{task_id}\n"
+        f"👤 المستخدم: {task['user_id']}\n"
+        f"💰 المبلغ: {task['price']} جنيه\n"
+        f"الرصيد أُضيف للرصيد المحجوز."
+    )
 
 
 # ==================== TASK: Admin rejects proof ====================
 async def admin_reject_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
 
     task_id = int(query.data.split("_")[-1])
@@ -217,24 +231,34 @@ async def admin_reject_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 task["user_id"],
                 f"❌ تم رفض المهمة #{task_id}.\nلن يتم إضافة مكافأة."
             )
-            await query.answer("❌ تم رفض المهمة وتم إرسال الإشعار للمستخدم", show_alert=True)
+            await query.answer(
+                f"❌ تم رفض المهمة\n"
+                f"🆔 المهمة: #{task_id}\n"
+                f"👤 المستخدم: {task['user_id']}",
+                show_alert=True
+            )
         except Exception as e:
             await query.answer(f"❌ تم الرفض لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
     else:
         await query.answer("❌ تم رفض المهمة", show_alert=True)
     
-    await query.edit_message_text(f"❌ تم رفض المهمة #{task_id}.")
+    await query.edit_message_text(
+        f"❌ تم رفض المهمة بنجاح\n"
+        f"🆔 المهمة: #{task_id}\n"
+        f"👤 المستخدم: {task['user_id'] if task else 'غير معروف'}"
+    )
 
 
 # ==================== TASK: Admin reports error ====================
 async def admin_error_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
 
     task_id = int(query.data.split("_")[-1])
     context.user_data["admin_error_task_id"] = task_id
+    await query.answer("📝 أرسل وصف الخطأ الآن", show_alert=False)
     await query.edit_message_text(f"📝 أرسل وصف الخطأ في المهمة #{task_id}:")
 
 
