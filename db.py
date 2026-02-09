@@ -558,6 +558,12 @@ def get_referral_count(user_id):
     return cursor.fetchone()["cnt"]
 
 
+def get_user_referrals(user_id):
+    """Get all referrals for a user"""
+    execute_query("SELECT * FROM referrals WHERE referrer_id=? ORDER BY created_at DESC", (user_id,))
+    return cursor.fetchall()
+
+
 def get_referral_completed_tasks(referrer_id):
     """Count tasks completed by referred users"""
     cursor.execute("""

@@ -6,7 +6,7 @@ from handlers_user import (
     new_task, admin_send_task_data, task_done, task_cancel, task_how_to,
     admin_approve_task, admin_reject_task, admin_error_task,
     balance, my_tasks, withdraw, withdraw_method_selected,
-    withdrawal_history, referrals, leaderboard, withdraw_referral,
+    withdrawal_history, referrals, my_referrals_list, leaderboard, withdraw_referral,
     help_cmd, tutorial,
     new_task_text, balance_text, my_tasks_text, withdraw_text,
     referrals_text, withdraw_referral_text, tutorial_text, help_text,
@@ -308,6 +308,8 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await withdraw(update, context)
     elif data == "referrals":
         await referrals(update, context)
+    elif data == "my_referrals_list":
+        await my_referrals_list(update, context)
     elif data == "leaderboard":
         await leaderboard(update, context)
     elif data == "withdraw_referral":

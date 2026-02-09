@@ -514,6 +514,7 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     invite_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
 
     keyboard = [
+        [InlineKeyboardButton("👥 بيانات المُحالين", callback_data="my_referrals_list")],
         [InlineKeyboardButton("🏆 تصنيف الإحالات", callback_data="leaderboard"),
          InlineKeyboardButton("💸 سحب رصيد الإحالات", callback_data="withdraw_referral")],
         [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_menu")],
@@ -527,6 +528,48 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 رصيد الإحالات: {user['referral_balance']} جنيه\n"
         f"🎁 مكافأة لكل مهمة يعملها المُحال: {ref_reward} جنيه"
     )
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def my_referrals_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    # Get all referrals
+    referrals = db.get_user_referrals(user_id)
+    
+    if not referrals:
+        await query.answer("⚠️ ليس لديك إحالات بعد", show_alert=True)
+        return
+    
+    msg = f"👥 المُحالين ({len(referrals)} شخص):\n\n"
+    
+    for ref in referrals[:20]:  # Show max 20
+        referred_id = ref['referred_id']
+        referred_user = db.get_user(referred_id)
+        
+        if referred_user:
+            user_dict = dict(referred_user)
+            username = user_dict.get('username', None)
+            display_name = f"@{username}" if username else f"ID: {referred_id}"
+        else:
+            display_name = f"ID: {referred_id}"
+        
+        # Get task stats for this referral
+        stats = db.get_user_task_stats(referred_id)
+        
+        msg += (
+            f"👤 {display_name}\n"
+            f"   📊 المهام: {stats['total']} | "
+            f"✅ {stats['approved']} | "
+            f"❌ {stats['rejected']}\n\n"
+        )
+    
+    if len(referrals) > 20:
+        msg += f"\n... و {len(referrals) - 20} آخرين"
+    
+    keyboard = [[InlineKeyboardButton("🔙 الإحالات", callback_data="referrals")]]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
@@ -779,6 +822,7 @@ async def referrals_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = (await context.bot.get_me()).username
     invite_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
     keyboard = [
+        [InlineKeyboardButton("👥 بيانات المُحالين", callback_data="my_referrals_list")],
         [InlineKeyboardButton("🏆 تصنيف الإحالات", callback_data="leaderboard")],
     ]
     msg = (
