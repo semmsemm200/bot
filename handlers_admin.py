@@ -9,9 +9,15 @@ from helpers import is_admin, send_to_admins
 def get_user_display_name(user):
     """Get user display name from user dict, handling missing columns"""
     try:
+        # Convert Row to dict if needed
+        if hasattr(user, 'keys'):
+            user_dict = dict(user)
+        else:
+            user_dict = user
+            
         # Try to get username first (this column always exists)
-        username = user.get('username', None)
-        user_id = user.get('id', 'غير معروف')
+        username = user_dict.get('username', None) if isinstance(user_dict, dict) else user['username']
+        user_id = user_dict.get('id', 'غير معروف') if isinstance(user_dict, dict) else user['id']
         
         # Return username or ID
         return username if username else str(user_id)
@@ -213,14 +219,17 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"📋 بيانات المستخدمين ({len(users)} مستخدم):\n\n"
         for u in users[:30]:
             try:
-                user_id = u.get('id', 0)
-                username = u.get('username', None)
-                available = u.get('available', 0)
-                reserved = u.get('reserved', 0)
-                referral_balance = u.get('referral_balance', 0)
+                # Convert sqlite3.Row to dict
+                user_dict = dict(u)
+                
+                user_id = user_dict.get('id', 0)
+                username = user_dict.get('username', None)
+                available = user_dict.get('available', 0)
+                reserved = user_dict.get('reserved', 0)
+                referral_balance = user_dict.get('referral_balance', 0)
                 
                 ref_count = db.get_referral_count(user_id)
-                display_name = get_user_display_name(u)
+                display_name = username if username else str(user_id)
                 username_display = f"@{username}" if username else "لا يوجد"
                 
                 msg += (
@@ -566,19 +575,18 @@ async def admin_search_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = []
     for u in users[:30]:  # Show first 30 users
-        # Build display name
-        display_name = ""
-        if u.get('first_name'):
-            display_name = u['first_name']
-            if u.get('last_name'):
-                display_name += f" {u['last_name']}"
+        # Convert sqlite3.Row to dict
+        user_dict = dict(u)
         
-        username_display = f"@{u['username']}" if u.get('username') else ""
-        button_text = f"👤 {display_name or 'غير معروف'} {username_display} (ID: {u['id']})"
+        user_id = user_dict.get('id', 0)
+        username = user_dict.get('username', None)
+        display_name = username if username else str(user_id)
+        username_display = f"@{username}" if username else ""
+        button_text = f"👤 {display_name} {username_display} (ID: {user_id})"
         
         keyboard.append([InlineKeyboardButton(
             button_text,
-            callback_data=f"admin_view_user_{u['id']}"
+            callback_data=f"admin_view_user_{user_id}"
         )])
     keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
     
@@ -594,21 +602,24 @@ async def admin_view_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(query.data.split("_")[-1])
     user = db.get_user(user_id)
     if user:
+        # Convert sqlite3.Row to dict
+        user_dict = dict(user)
+        
         ref_count = db.get_referral_count(user_id)
         stats = db.get_user_task_stats(user_id)
         
-        display_name = get_user_display_name(user)
-        username = user.get('username', None)
+        username = user_dict.get('username', None)
+        display_name = username if username else str(user_id)
         username_display = f"@{username}" if username else "لا يوجد"
         
         msg = (
             f"بيانات المستخدم:\n\n"
             f"👤 الاسم: {display_name}\n"
             f"📱 اليوزر: {username_display}\n"
-            f"🆔 ID: {user['id']}\n"
-            f"💰 رصيد متاح: {user['available']}\n"
-            f"🔒 رصيد محجوز: {user['reserved']}\n"
-            f"👥 رصيد إحالات: {user['referral_balance']}\n"
+            f"🆔 ID: {user_dict['id']}\n"
+            f"💰 رصيد متاح: {user_dict['available']}\n"
+            f"🔒 رصيد محجوز: {user_dict['reserved']}\n"
+            f"👥 رصيد إحالات: {user_dict['referral_balance']}\n"
             f"📋 إجمالي المهام: {stats['total']}\n"
             f"✅ مهام مقبولة: {stats['approved']}\n"
             f"❌ مهام مرفوضة: {stats['rejected']}\n"
@@ -636,21 +647,24 @@ async def admin_clear_balance(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     keyboard = []
     for u in users[:30]:
-        total = u['available'] + u['reserved'] + u['referral_balance']
+        # Convert sqlite3.Row to dict
+        user_dict = dict(u)
+        
+        user_id = user_dict.get('id', 0)
+        username = user_dict.get('username', None)
+        available = user_dict.get('available', 0)
+        reserved = user_dict.get('reserved', 0)
+        referral_balance = user_dict.get('referral_balance', 0)
+        
+        total = available + reserved + referral_balance
         if total > 0:  # Only show users with balance
-            # Build display name
-            display_name = ""
-            if u.get('first_name'):
-                display_name = u['first_name']
-                if u.get('last_name'):
-                    display_name += f" {u['last_name']}"
-            
-            username_display = f"@{u['username']}" if u.get('username') else ""
-            button_text = f"🗑️ {display_name or 'غير معروف'} {username_display} - {total} جنيه"
+            display_name = username if username else str(user_id)
+            username_display = f"@{username}" if username else ""
+            button_text = f"🗑️ {display_name} {username_display} - {total} جنيه"
             
             keyboard.append([InlineKeyboardButton(
                 button_text,
-                callback_data=f"admin_do_clear_{u['id']}"
+                callback_data=f"admin_do_clear_{user_id}"
             )])
     
     if not keyboard:
@@ -798,19 +812,20 @@ async def admin_reward_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = []
     for u in users[:30]:
-        # Build display name
-        display_name = ""
-        if u.get('first_name'):
-            display_name = u['first_name']
-            if u.get('last_name'):
-                display_name += f" {u['last_name']}"
+        # Convert sqlite3.Row to dict
+        user_dict = dict(u)
         
-        username_display = f"@{u['username']}" if u.get('username') else ""
-        button_text = f"🎁 {display_name or 'غير معروف'} {username_display} (رصيد: {u['available']})"
+        user_id = user_dict.get('id', 0)
+        username = user_dict.get('username', None)
+        available = user_dict.get('available', 0)
+        
+        display_name = username if username else str(user_id)
+        username_display = f"@{username}" if username else ""
+        button_text = f"🎁 {display_name} {username_display} (رصيد: {available})"
         
         keyboard.append([InlineKeyboardButton(
             button_text,
-            callback_data=f"admin_reward_select_{u['id']}"
+            callback_data=f"admin_reward_select_{user_id}"
         )])
     keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
     
@@ -891,23 +906,23 @@ async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = []
     for u in users[:30]:
-        is_banned = db.is_user_banned(u['id'])
+        # Convert sqlite3.Row to dict
+        user_dict = dict(u)
+        
+        user_id = user_dict.get('id', 0)
+        username = user_dict.get('username', None)
+        
+        is_banned = db.is_user_banned(user_id)
         status = "🚫 محظور" if is_banned else "✅ نشط"
         action = "رفع الحظر" if is_banned else "حظر"
         
-        # Build display name
-        display_name = ""
-        if u.get('first_name'):
-            display_name = u['first_name']
-            if u.get('last_name'):
-                display_name += f" {u['last_name']}"
-        
-        username_display = f"@{u['username']}" if u.get('username') else ""
-        button_text = f"{status} {display_name or 'غير معروف'} {username_display} - {action}"
+        display_name = username if username else str(user_id)
+        username_display = f"@{username}" if username else ""
+        button_text = f"{status} {display_name} {username_display} - {action}"
         
         keyboard.append([InlineKeyboardButton(
             button_text,
-            callback_data=f"admin_do_ban_{u['id']}"
+            callback_data=f"admin_do_ban_{user_id}"
         )])
     keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
     
