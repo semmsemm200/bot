@@ -21,12 +21,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Handle referral link: /start ref_12345
     referrer_id = 0
-    if context.args and context.args[0].startswith("ref_"):
+    if context.args and len(context.args) > 0 and context.args[0].startswith("ref_"):
         try:
             referrer_id = int(context.args[0].replace("ref_", ""))
             if referrer_id == user_id:
                 referrer_id = 0
-        except ValueError:
+        except (ValueError, IndexError):
             referrer_id = 0
 
     # Register user (removed channel check)

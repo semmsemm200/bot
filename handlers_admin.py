@@ -178,39 +178,46 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
 
-    users = db.get_all_users()
-    if not users:
+    try:
+        users = db.get_all_users()
+        if not users:
+            keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
+            await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        
+        msg = "📋 بيانات المستخدمين:\n\n"
+        for u in users[:30]:
+            try:
+                ref_count = db.get_referral_count(u["id"])
+                
+                # Build display name - handle None values safely
+                first_name = u.get('first_name') if u.get('first_name') else (u.get('username') if u.get('username') else str(u['id']))
+                last_name = u.get('last_name') if u.get('last_name') else ""
+                
+                display_name = first_name
+                if last_name:
+                    display_name += f" {last_name}"
+                
+                username_display = f"@{u['username']}" if u.get('username') else "لا يوجد"
+                
+                msg += (
+                    f"👤 {display_name}\n"
+                    f"🆔 ID: {u['id']} | 📱 {username_display}\n"
+                    f"💰 متاح: {u['available']} | 🔒 محجوز: {u['reserved']} | 👥 إحالات: {u['referral_balance']} | عدد: {ref_count}\n\n"
+                )
+            except Exception as e:
+                # Skip this user if there's an error
+                msg += f"⚠️ خطأ في قراءة بيانات المستخدم {u.get('id', 'غير معروف')}\n\n"
+                continue
+
+        if len(msg) > 4000:
+            msg = msg[:4000] + "\n... (تم اقتطاع القائمة)"
+
         keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
-        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    msg = "📋 بيانات المستخدمين:\n\n"
-    for u in users[:30]:
-        ref_count = db.get_referral_count(u["id"])
-        
-        # Build display name
-        display_name = ""
-        first_name = u.get('first_name') or u.get('username') or str(u['id'])
-        last_name = u.get('last_name') or ""
-        
-        if first_name:
-            display_name = first_name
-            if last_name:
-                display_name += f" {last_name}"
-        
-        username_display = f"@{u['username']}" if u.get('username') else "لا يوجد"
-        
-        msg += (
-            f"👤 {display_name}\n"
-            f"🆔 ID: {u['id']} | 📱 {username_display}\n"
-            f"💰 متاح: {u['available']} | 🔒 محجوز: {u['reserved']} | 👥 إحالات: {u['referral_balance']} | عدد: {ref_count}\n\n"
-        )
-
-    if len(msg) > 4000:
-        msg = msg[:4000] + "\n... (تم اقتطاع القائمة)"
-
-    keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    except Exception as e:
+        keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
+        await query.edit_message_text(f"⚠️ حدث خطأ في قراءة البيانات: {str(e)}", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 # ==================== ADMIN RESERVED ====================
