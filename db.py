@@ -255,7 +255,13 @@ def init_db():
         "leaderboard_min_tasks": "20",
     }
     for k, v in defaults.items():
-        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+        if DB_TYPE == 'postgresql':
+            execute_query("""
+                INSERT INTO settings (key, value) VALUES (?, ?)
+                ON CONFLICT (key) DO NOTHING
+            """, (k, v))
+        else:
+            execute_query("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
 
     # Default withdrawal methods
     default_methods = [
@@ -264,8 +270,14 @@ def init_db():
         ("Binance Pay", 50, 0),
     ]
     for name, min_amt, fee in default_methods:
-        cursor.execute("INSERT OR IGNORE INTO withdrawal_methods (name, min_amount, fee) VALUES (?, ?, ?)",
-                       (name, min_amt, fee))
+        if DB_TYPE == 'postgresql':
+            execute_query("""
+                INSERT INTO withdrawal_methods (name, min_amount, fee) VALUES (?, ?, ?)
+                ON CONFLICT (name) DO NOTHING
+            """, (name, min_amt, fee))
+        else:
+            execute_query("INSERT OR IGNORE INTO withdrawal_methods (name, min_amount, fee) VALUES (?, ?, ?)",
+                          (name, min_amt, fee))
     conn.commit()
 
 
@@ -284,26 +296,42 @@ def set_setting(key, value):
 def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
     # Try to insert with new columns first
     try:
-        cursor.execute(
-            "INSERT OR IGNORE INTO users (id, username, first_name, last_name, referrer_id) VALUES (?, ?, ?, ?, ?)",
-            (user_id, username, first_name, last_name, referrer_id)
-        )
-        # Update existing user's name if they already exist
-        cursor.execute(
-            "UPDATE users SET username=?, first_name=?, last_name=? WHERE id=?",
-            (username, first_name, last_name, user_id)
-        )
+        if DB_TYPE == 'postgresql':
+            execute_query("""
+                INSERT INTO users (id, username, first_name, last_name, referrer_id) 
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE SET 
+                    username = EXCLUDED.username,
+                    first_name = EXCLUDED.first_name,
+                    last_name = EXCLUDED.last_name
+            """, (user_id, username, first_name, last_name, referrer_id))
+        else:
+            cursor.execute(
+                "INSERT OR IGNORE INTO users (id, username, first_name, last_name, referrer_id) VALUES (?, ?, ?, ?, ?)",
+                (user_id, username, first_name, last_name, referrer_id)
+            )
+            # Update existing user's name if they already exist
+            cursor.execute(
+                "UPDATE users SET username=?, first_name=?, last_name=? WHERE id=?",
+                (username, first_name, last_name, user_id)
+            )
     except Exception:
         # Fallback to old schema without first_name and last_name
-        cursor.execute(
-            "INSERT OR IGNORE INTO users (id, username, referrer_id) VALUES (?, ?, ?)",
-            (user_id, username, referrer_id)
-        )
-        # Update existing user
-        cursor.execute(
-            "UPDATE users SET username=? WHERE id=?",
-            (username, user_id)
-        )
+        if DB_TYPE == 'postgresql':
+            execute_query("""
+                INSERT INTO users (id, username, referrer_id) VALUES (?, ?, ?)
+                ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+            """, (user_id, username, referrer_id))
+        else:
+            cursor.execute(
+                "INSERT OR IGNORE INTO users (id, username, referrer_id) VALUES (?, ?, ?)",
+                (user_id, username, referrer_id)
+            )
+            # Update existing user
+            cursor.execute(
+                "UPDATE users SET username=? WHERE id=?",
+                (username, user_id)
+            )
     conn.commit()
 
 
@@ -519,14 +547,14 @@ def set_withdrawal_receipt(wid, file_id):
 
 # ---- Referrals ----
 def add_referral(referrer_id, referred_id):
-    cursor.execute("SELECT * FROM referrals WHERE referrer_id=? AND referred_id=?", (referrer_id, referred_id))
+    execute_query("SELECT * FROM referrals WHERE referrer_id=? AND referred_id=?", (referrer_id, referred_id))
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
+        execute_query("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
         conn.commit()
 
 
 def get_referral_count(user_id):
-    cursor.execute("SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id=?", (user_id,))
+    execute_query("SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id=?", (user_id,))
     return cursor.fetchone()["cnt"]
 
 
@@ -556,7 +584,10 @@ def get_leaderboard():
 
 # ---- Admins ----
 def add_admin(admin_id):
-    cursor.execute("INSERT OR IGNORE INTO admins (id) VALUES (?)", (admin_id,))
+    if DB_TYPE == 'postgresql':
+        execute_query("INSERT INTO admins (id) VALUES (?) ON CONFLICT (id) DO NOTHING", (admin_id,))
+    else:
+        cursor.execute("INSERT OR IGNORE INTO admins (id) VALUES (?)", (admin_id,))
     conn.commit()
 
 
