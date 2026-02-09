@@ -264,48 +264,169 @@ async def admin_reserved(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("✅ لا يوجد رصيد محجوز.", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    msg = "🔒 المهام ذات الرصيد المحجوز:\n\n"
-    for t in tasks[:20]:
-        msg += f"#{t['id']} | مستخدم: {t['user_id']} | {t['price']} جنيه | حتى: {t['reserved_until']}\n"
-
-    # Check if any are ready to release
-    ready = db.get_tasks_ready_to_release()
-    if ready:
-        msg += f"\n⏰ {len(ready)} مهمة جاهزة للتحويل للرصيد المتاح.\n"
-        for t in ready:
-            kb = [[InlineKeyboardButton("✅ تحويل للمتاح", callback_data=f"admin_release_{t['id']}")]]
+    from datetime import datetime
+    
+    msg = f"🔒 المهام ذات الرصيد المحجوز ({len(tasks)} مهمة):\n\n"
+    
+    # Send detailed cards for each task
+    for t in tasks[:15]:
+        try:
+            # Calculate time remaining
+            reserved_until = datetime.fromisoformat(t['reserved_until'])
+            now = datetime.now()
+            time_diff = reserved_until - now
+            
+            if time_diff.total_seconds() > 0:
+                hours = int(time_diff.total_seconds() // 3600)
+                minutes = int((time_diff.total_seconds() % 3600) // 60)
+                time_remaining = f"⏰ باقي: {hours} ساعة و {minutes} دقيقة"
+                status_emoji = "🟡"
+            else:
+                time_remaining = "✅ جاهز للتحرير"
+                status_emoji = "🟢"
+            
+            # Get user info
+            user = db.get_user(t['user_id'])
+            user_dict = dict(user) if user else {}
+            username = user_dict.get('username', None) if user else None
+            display_name = username if username else str(t['user_id'])
+            
+            # Create task card
+            task_msg = (
+                f"{status_emoji} المهمة #{t['id']}\n"
+                f"👤 المستخدم: {display_name} (ID: {t['user_id']})\n"
+                f"💰 المبلغ: {t['price']} جنيه\n"
+                f"{time_remaining}\n"
+                f"📅 تاريخ الموافقة: {t.get('completed_at', 'غير محدد')}\n"
+            )
+            
+            # Add admin data if exists
+            if t.get('admin_data'):
+                task_msg += f"📝 البيانات: {t['admin_data'][:50]}...\n"
+            
+            # Create buttons
+            keyboard = [
+                [InlineKeyboardButton("✅ تحرير الرصيد الآن", callback_data=f"admin_release_{t['id']}")],
+                [InlineKeyboardButton("📋 عرض التفاصيل الكاملة", callback_data=f"admin_task_details_{t['id']}")]
+            ]
+            
             await context.bot.send_message(
                 query.from_user.id,
-                f"⏰ المهمة #{t['id']} جاهزة للتحويل\n"
-                f"👤 مستخدم: {t['user_id']}\n"
-                f"💰 المبلغ: {t['price']} جنيه\n"
-                f"هل تريد تحويل الرصيد للمتاح؟",
-                reply_markup=InlineKeyboardMarkup(kb)
+                task_msg,
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
-
+        except Exception as e:
+            continue
+    
     keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_text(
+        f"🔒 تم عرض {min(len(tasks), 15)} مهمة محجوزة\n\n"
+        f"💡 يمكنك تحرير أي رصيد يدوياً أو انتظار التحرير التلقائي بعد 48 ساعة.",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def admin_release_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
 
     task_id = int(query.data.split("_")[-1])
     task = db.get_task(task_id)
     if not task or task["status"] != "approved":
+        await query.answer("⚠️ المهمة غير موجودة أو تم تحويلها بالفعل", show_alert=True)
         await query.edit_message_text("⚠️ المهمة غير موجودة أو تم تحويلها بالفعل.")
         return
 
     db.release_task(task_id)
     db.move_reserved_to_available(task["user_id"], task["price"])
 
-    await query.edit_message_text(f"✅ تم تحويل {task['price']} جنيه للرصيد المتاح للمستخدم {task['user_id']}.")
-    await context.bot.send_message(task["user_id"],
-        f"✅ تم تحويل {task['price']} جنيه من الرصيد المحجوز إلى الرصيد المتاح!"
+    await query.answer(f"✅ تم تحرير الرصيد\n💰 {task['price']} جنيه\n👤 المستخدم: {task['user_id']}", show_alert=True)
+    await query.edit_message_text(
+        f"✅ تم تحويل الرصيد للمتاح بنجاح\n\n"
+        f"🆔 المهمة: #{task_id}\n"
+        f"👤 المستخدم: {task['user_id']}\n"
+        f"💰 المبلغ: {task['price']} جنيه"
     )
+    
+    # Notify user
+    try:
+        await context.bot.send_message(
+            task["user_id"],
+            f"✅ تم تحويل {task['price']} جنيه من الرصيد المحجوز إلى الرصيد المتاح!"
+        )
+    except Exception:
+        pass
+
+
+async def admin_task_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    task_id = int(query.data.split("_")[-1])
+    task = db.get_task(task_id)
+    
+    if not task:
+        await query.edit_message_text("⚠️ المهمة غير موجودة.")
+        return
+    
+    from datetime import datetime
+    
+    # Convert to dict
+    task_dict = dict(task)
+    
+    # Get user info
+    user = db.get_user(task_dict['user_id'])
+    user_dict = dict(user) if user else {}
+    username = user_dict.get('username', None) if user else None
+    display_name = username if username else str(task_dict['user_id'])
+    
+    # Calculate time
+    if task_dict.get('reserved_until'):
+        reserved_until = datetime.fromisoformat(task_dict['reserved_until'])
+        now = datetime.now()
+        time_diff = reserved_until - now
+        
+        if time_diff.total_seconds() > 0:
+            hours = int(time_diff.total_seconds() // 3600)
+            minutes = int((time_diff.total_seconds() % 3600) // 60)
+            time_status = f"⏰ باقي: {hours} ساعة و {minutes} دقيقة"
+        else:
+            time_status = "✅ جاهز للتحرير الآن"
+    else:
+        time_status = "غير محدد"
+    
+    # Build detailed message
+    msg = (
+        f"📋 تفاصيل المهمة #{task_id}\n\n"
+        f"👤 المستخدم: {display_name}\n"
+        f"🆔 ID: {task_dict['user_id']}\n"
+        f"💰 المبلغ: {task_dict['price']} جنيه\n"
+        f"📊 الحالة: {task_dict['status']}\n"
+        f"{time_status}\n\n"
+    )
+    
+    if task_dict.get('admin_data'):
+        msg += f"📝 البيانات المرسلة:\n{task_dict['admin_data']}\n\n"
+    
+    if task_dict.get('created_at'):
+        msg += f"📅 تاريخ الإنشاء: {task_dict['created_at']}\n"
+    
+    if task_dict.get('completed_at'):
+        msg += f"✅ تاريخ الموافقة: {task_dict['completed_at']}\n"
+    
+    if task_dict.get('reserved_until'):
+        msg += f"🔒 محجوز حتى: {task_dict['reserved_until']}\n"
+    
+    keyboard = [
+        [InlineKeyboardButton("✅ تحرير الرصيد الآن", callback_data=f"admin_release_{task_id}")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="admin_reserved")]
+    ]
+    
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 # ==================== ADMIN SETTINGS ====================
