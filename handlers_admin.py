@@ -8,24 +8,15 @@ from helpers import is_admin, send_to_admins
 # Helper function to get user display name
 def get_user_display_name(user):
     """Get user display name from user dict, handling missing columns"""
-    display_name = None
     try:
-        first_name = user['first_name'] if 'first_name' in user.keys() else None
-        last_name = user['last_name'] if 'last_name' in user.keys() else None
-        
-        if first_name:
-            display_name = first_name
-            if last_name:
-                display_name += f" {last_name}"
-    except (KeyError, TypeError):
-        pass
-    
-    # Fallback to username or ID
-    if not display_name:
+        # Try to get username first (this column always exists)
         username = user.get('username', None)
-        display_name = username if username else str(user.get('id', 'غير معروف'))
-    
-    return display_name
+        user_id = user.get('id', 'غير معروف')
+        
+        # Return username or ID
+        return username if username else str(user_id)
+    except Exception:
+        return "غير معروف"
 
 
 # ==================== ADMIN PANEL ====================

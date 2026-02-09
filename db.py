@@ -134,15 +134,28 @@ def set_setting(key, value):
 
 # ---- Users ----
 def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
-    cursor.execute(
-        "INSERT OR IGNORE INTO users (id, username, first_name, last_name, referrer_id) VALUES (?, ?, ?, ?, ?)",
-        (user_id, username, first_name, last_name, referrer_id)
-    )
-    # Update existing user's name if they already exist
-    cursor.execute(
-        "UPDATE users SET username=?, first_name=?, last_name=? WHERE id=?",
-        (username, first_name, last_name, user_id)
-    )
+    # Try to insert with new columns first
+    try:
+        cursor.execute(
+            "INSERT OR IGNORE INTO users (id, username, first_name, last_name, referrer_id) VALUES (?, ?, ?, ?, ?)",
+            (user_id, username, first_name, last_name, referrer_id)
+        )
+        # Update existing user's name if they already exist
+        cursor.execute(
+            "UPDATE users SET username=?, first_name=?, last_name=? WHERE id=?",
+            (username, first_name, last_name, user_id)
+        )
+    except Exception:
+        # Fallback to old schema without first_name and last_name
+        cursor.execute(
+            "INSERT OR IGNORE INTO users (id, username, referrer_id) VALUES (?, ?, ?)",
+            (user_id, username, referrer_id)
+        )
+        # Update existing user
+        cursor.execute(
+            "UPDATE users SET username=? WHERE id=?",
+            (username, user_id)
+        )
     conn.commit()
 
 
