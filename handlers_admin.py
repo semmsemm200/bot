@@ -182,9 +182,20 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📋 بيانات المستخدمين:\n\n"
     for u in users[:30]:
         ref_count = db.get_referral_count(u["id"])
+        
+        # Build display name
+        display_name = ""
+        if u.get('first_name'):
+            display_name = u['first_name']
+            if u.get('last_name'):
+                display_name += f" {u['last_name']}"
+        
+        username_display = f"@{u['username']}" if u.get('username') else "لا يوجد"
+        
         msg += (
-            f"🆔 {u['id']} | {u['username'] or '-'}\n"
-            f"  💰 متاح: {u['available']} | 🔒 محجوز: {u['reserved']} | 👥 إحالات: {u['referral_balance']} | عدد: {ref_count}\n"
+            f"👤 {display_name or 'غير معروف'}\n"
+            f"🆔 ID: {u['id']} | 📱 {username_display}\n"
+            f"💰 متاح: {u['available']} | 🔒 محجوز: {u['reserved']} | 👥 إحالات: {u['referral_balance']} | عدد: {ref_count}\n\n"
         )
 
     if len(msg) > 4000:
@@ -518,8 +529,18 @@ async def admin_search_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = []
     for u in users[:30]:  # Show first 30 users
+        # Build display name
+        display_name = ""
+        if u.get('first_name'):
+            display_name = u['first_name']
+            if u.get('last_name'):
+                display_name += f" {u['last_name']}"
+        
+        username_display = f"@{u['username']}" if u.get('username') else ""
+        button_text = f"👤 {display_name or 'غير معروف'} {username_display} (ID: {u['id']})"
+        
         keyboard.append([InlineKeyboardButton(
-            f"👤 {u['username'] or u['id']} (ID: {u['id']})",
+            button_text,
             callback_data=f"admin_view_user_{u['id']}"
         )])
     keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
@@ -538,10 +559,21 @@ async def admin_view_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user:
         ref_count = db.get_referral_count(user_id)
         stats = db.get_user_task_stats(user_id)
+        
+        # Build display name
+        display_name = ""
+        if user.get('first_name'):
+            display_name = user['first_name']
+            if user.get('last_name'):
+                display_name += f" {user['last_name']}"
+        
+        username_display = f"@{user['username']}" if user.get('username') else "لا يوجد"
+        
         msg = (
             f"بيانات المستخدم:\n\n"
+            f"👤 الاسم: {display_name or 'غير معروف'}\n"
+            f"📱 اليوزر: {username_display}\n"
             f"🆔 ID: {user['id']}\n"
-            f"👤 الاسم: {user['username'] or '-'}\n"
             f"💰 رصيد متاح: {user['available']}\n"
             f"🔒 رصيد محجوز: {user['reserved']}\n"
             f"👥 رصيد إحالات: {user['referral_balance']}\n"
@@ -574,8 +606,18 @@ async def admin_clear_balance(update: Update, context: ContextTypes.DEFAULT_TYPE
     for u in users[:30]:
         total = u['available'] + u['reserved'] + u['referral_balance']
         if total > 0:  # Only show users with balance
+            # Build display name
+            display_name = ""
+            if u.get('first_name'):
+                display_name = u['first_name']
+                if u.get('last_name'):
+                    display_name += f" {u['last_name']}"
+            
+            username_display = f"@{u['username']}" if u.get('username') else ""
+            button_text = f"🗑️ {display_name or 'غير معروف'} {username_display} - {total} جنيه"
+            
             keyboard.append([InlineKeyboardButton(
-                f"🗑️ {u['username'] or u['id']} - {total} جنيه",
+                button_text,
                 callback_data=f"admin_do_clear_{u['id']}"
             )])
     
@@ -724,8 +766,18 @@ async def admin_reward_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = []
     for u in users[:30]:
+        # Build display name
+        display_name = ""
+        if u.get('first_name'):
+            display_name = u['first_name']
+            if u.get('last_name'):
+                display_name += f" {u['last_name']}"
+        
+        username_display = f"@{u['username']}" if u.get('username') else ""
+        button_text = f"🎁 {display_name or 'غير معروف'} {username_display} (رصيد: {u['available']})"
+        
         keyboard.append([InlineKeyboardButton(
-            f"🎁 {u['username'] or u['id']} (رصيد: {u['available']})",
+            button_text,
             callback_data=f"admin_reward_select_{u['id']}"
         )])
     keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
@@ -810,8 +862,19 @@ async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_banned = db.is_user_banned(u['id'])
         status = "🚫 محظور" if is_banned else "✅ نشط"
         action = "رفع الحظر" if is_banned else "حظر"
+        
+        # Build display name
+        display_name = ""
+        if u.get('first_name'):
+            display_name = u['first_name']
+            if u.get('last_name'):
+                display_name += f" {u['last_name']}"
+        
+        username_display = f"@{u['username']}" if u.get('username') else ""
+        button_text = f"{status} {display_name or 'غير معروف'} {username_display} - {action}"
+        
         keyboard.append([InlineKeyboardButton(
-            f"{status} {u['username'] or u['id']} - {action}",
+            button_text,
             callback_data=f"admin_do_ban_{u['id']}"
         )])
     keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])

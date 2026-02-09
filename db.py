@@ -12,6 +12,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
             username TEXT,
+            first_name TEXT,
+            last_name TEXT,
             available INTEGER DEFAULT 0,
             reserved INTEGER DEFAULT 0,
             referral_balance INTEGER DEFAULT 0,
@@ -77,6 +79,19 @@ def init_db():
         # Column already exists
         pass
     
+    # Add first_name and last_name columns if they don't exist
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN first_name TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN last_name TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    
     conn.commit()
 
     # Default settings
@@ -118,9 +133,16 @@ def set_setting(key, value):
 
 
 # ---- Users ----
-def add_user(user_id, username, referrer_id=0):
-    cursor.execute("INSERT OR IGNORE INTO users (id, username, referrer_id) VALUES (?, ?, ?)",
-                   (user_id, username, referrer_id))
+def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
+    cursor.execute(
+        "INSERT OR IGNORE INTO users (id, username, first_name, last_name, referrer_id) VALUES (?, ?, ?, ?, ?)",
+        (user_id, username, first_name, last_name, referrer_id)
+    )
+    # Update existing user's name if they already exist
+    cursor.execute(
+        "UPDATE users SET username=?, first_name=?, last_name=? WHERE id=?",
+        (username, first_name, last_name, user_id)
+    )
     conn.commit()
 
 

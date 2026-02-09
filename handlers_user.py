@@ -10,7 +10,9 @@ from helpers import (
 # ==================== START ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    username = update.effective_user.username or update.effective_user.first_name
+    username = update.effective_user.username
+    first_name = update.effective_user.first_name
+    last_name = update.effective_user.last_name
 
     # Check if user is banned
     if db.is_user_banned(user_id):
@@ -28,7 +30,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             referrer_id = 0
 
     # Register user (removed channel check)
-    db.add_user(user_id, username, referrer_id)
+    db.add_user(user_id, username, referrer_id, first_name, last_name)
     if referrer_id and referrer_id != user_id:
         referrer = db.get_user(referrer_id)
         if referrer:
@@ -43,10 +45,12 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    username = query.from_user.username or query.from_user.first_name
+    username = query.from_user.username
+    first_name = query.from_user.first_name
+    last_name = query.from_user.last_name
 
     referrer_id = context.user_data.get("pending_referrer", 0)
-    db.add_user(user_id, username, referrer_id)
+    db.add_user(user_id, username, referrer_id, first_name, last_name)
     if referrer_id and referrer_id != user_id:
         referrer = db.get_user(referrer_id)
         if referrer:
