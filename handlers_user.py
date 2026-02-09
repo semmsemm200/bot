@@ -538,16 +538,44 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     min_refs = int(db.get_setting("leaderboard_min_referrals") or 10)
     min_tasks = int(db.get_setting("leaderboard_min_tasks") or 20)
 
-    msg = f"🏆 تصنيف الإحالات\n(الحد الأدنى: {min_refs} إحالة و {min_tasks} مهمة)\n\n"
+    msg = f"🏆 تصنيف الإحالات\n\n"
+    msg += f"💎 شروط المكافأة:\n"
+    msg += f"• {min_refs} إحالات على الأقل\n"
+    msg += f"• {min_tasks} مهمة مقبولة من المُحالين\n\n"
+    msg += "📊 الترتيب:\n\n"
 
-    rank = 1
-    for entry in lb[:10]:
-        if entry["ref_count"] >= min_refs and entry["task_count"] >= min_tasks:
-            msg += f"{rank}. {entry['username'] or entry['referrer_id']} - {entry['ref_count']} إحالة\n"
+    if not lb:
+        msg += "لا يوجد مشاركين حالياً."
+    else:
+        rank = 1
+        for entry in lb[:20]:  # Show top 20
+            username = entry['username'] if entry['username'] else f"ID: {entry['referrer_id']}"
+            ref_count = entry['ref_count']
+            task_count = entry['task_count']
+            
+            # Check if qualified for rewards
+            is_qualified = ref_count >= min_refs and task_count >= min_tasks
+            
+            if is_qualified:
+                # Qualified users get special emoji
+                msg += f"💎 {rank}. {username}\n"
+                msg += f"   👥 {ref_count} إحالة | ✅ {task_count} مهمة\n\n"
+            else:
+                # Non-qualified users shown normally
+                msg += f"⭐ {rank}. {username}\n"
+                msg += f"   👥 {ref_count} إحالة | ✅ {task_count} مهمة\n"
+                
+                # Show what's missing
+                missing = []
+                if ref_count < min_refs:
+                    missing.append(f"يحتاج {min_refs - ref_count} إحالة")
+                if task_count < min_tasks:
+                    missing.append(f"يحتاج {min_tasks - task_count} مهمة")
+                
+                if missing:
+                    msg += f"   ⚠️ {' و '.join(missing)}\n\n"
+            
             rank += 1
-
-    if rank == 1:
-        msg += "لا يوجد مشاركين مؤهلين حالياً."
 
     keyboard = [[InlineKeyboardButton("🔙 الإحالات", callback_data="referrals")]]
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
