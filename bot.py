@@ -15,7 +15,8 @@ from handlers_user import (
 from handlers_admin import (
     admin_panel, admin_pending_tasks, admin_withdrawals,
     admin_approve_withdrawal, admin_reject_withdrawal,
-    admin_users, admin_users_list, admin_reserved, admin_release_task, admin_task_details,
+    admin_users, admin_users_list, admin_reserved, admin_reserved_user_tasks, 
+    admin_release_all_user_tasks, admin_release_task, admin_task_details,
     admin_settings, admin_toggle_bot,
     admin_set_task_price, admin_set_price_value, admin_set_ref_reward, admin_set_ref_value,
     admin_set_min_w, admin_set_minw_value,
@@ -349,6 +350,10 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_users_list(update, context)
     elif data == "admin_reserved":
         await admin_reserved(update, context)
+    elif data.startswith("admin_reserved_user_"):
+        await admin_reserved_user_tasks(update, context)
+    elif data.startswith("admin_release_all_"):
+        await admin_release_all_user_tasks(update, context)
     elif data.startswith("admin_release_"):
         await admin_release_task(update, context)
     elif data.startswith("admin_task_details_"):

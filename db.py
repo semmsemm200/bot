@@ -419,6 +419,12 @@ def get_reserved_tasks():
     return cursor.fetchall()
 
 
+def get_reserved_tasks_by_user(user_id):
+    """Get all reserved tasks for a specific user"""
+    cursor.execute("SELECT * FROM tasks WHERE status='approved' AND user_id=? ORDER BY reserved_until ASC", (user_id,))
+    return cursor.fetchall()
+
+
 # ---- Withdrawals ----
 def create_withdrawal(user_id, method, data, amount):
     cursor.execute("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?)",
