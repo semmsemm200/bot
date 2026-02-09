@@ -15,9 +15,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last_name = update.effective_user.last_name
 
     # Check if user is banned
-    if db.is_user_banned(user_id):
-        await update.message.reply_text("⛔ تم حظرك من استخدام البوت.")
-        return
+    try:
+        if db.is_user_banned(user_id):
+            await update.message.reply_text("⛔ تم حظرك من استخدام البوت.")
+            return
+    except Exception:
+        pass
 
     # Handle referral link: /start ref_12345
     referrer_id = 0
@@ -35,7 +38,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['last_name'] = last_name
 
     # Check channel membership
-    is_member = await check_channel_member(context.bot, user_id)
+    try:
+        is_member = await check_channel_member(context.bot, user_id)
+    except Exception as e:
+        # If channel check fails, skip it and register user
+        print(f"Channel check failed: {e}")
+        is_member = True  # Allow user to continue
     
     if not is_member:
         keyboard = [[InlineKeyboardButton("📢 اشترك في القناة", url=CHANNEL_LINK)],
@@ -49,11 +57,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Register user
-    db.add_user(user_id, username, referrer_id, first_name, last_name)
-    if referrer_id and referrer_id != user_id:
-        referrer = db.get_user(referrer_id)
-        if referrer:
-            db.add_referral(referrer_id, user_id)
+    try:
+        db.add_user(user_id, username, referrer_id, first_name, last_name)
+        if referrer_id and referrer_id != user_id:
+            referrer = db.get_user(referrer_id)
+            if referrer:
+                db.add_referral(referrer_id, user_id)
+    except Exception as e:
+        print(f"Error adding user: {e}")
 
     msg = "مرحباً، كل شيء هنا بسيط وسهل، ستقوم بعمل مهمات مقابل مكافأة."
     await update.message.reply_text(msg, reply_markup=get_main_menu_keyboard(user_id))
