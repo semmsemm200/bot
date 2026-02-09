@@ -540,7 +540,10 @@ async def my_referrals_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     referrals = db.get_user_referrals(user_id)
     
     if not referrals:
-        await query.answer("⚠️ ليس لديك إحالات بعد", show_alert=True)
+        await query.edit_message_text(
+            "⚠️ ليس لديك إحالات بعد",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("� الإحالات", callback_data="referrals")]])
+        )
         return
     
     msg = f"👥 المُحالين ({len(referrals)} شخص):\n\n"
