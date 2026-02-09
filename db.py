@@ -40,6 +40,30 @@ def execute_query(query, params=None):
         raise e
 
 
+def safe_fetchone(query, params=None):
+    """Safely fetch one row with automatic rollback on error"""
+    try:
+        execute_query(query, params)
+        return cursor.fetchone()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error in safe_fetchone: {e}")
+        return None
+
+
+def safe_fetchall(query, params=None):
+    """Safely fetch all rows with automatic rollback on error"""
+    try:
+        execute_query(query, params)
+        return cursor.fetchall()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error in safe_fetchall: {e}")
+        return []
+
+
 def execute_insert_or_replace(table, key_col, key_val, data_dict):
     """Insert or replace/update a row"""
     try:
@@ -299,9 +323,12 @@ def init_db():
 
 # ---- Settings ----
 def get_setting(key):
-    execute_query("SELECT value FROM settings WHERE key=?", (key,))
-    row = cursor.fetchone()
-    return row["value"] if row else None
+    try:
+        row = safe_fetchone("SELECT value FROM settings WHERE key=?", (key,))
+        return row["value"] if row else None
+    except Exception as e:
+        print(f"Error getting setting {key}: {e}")
+        return None
 
 
 def set_setting(key, value):
@@ -336,6 +363,7 @@ def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
     except Exception as e:
         if DB_TYPE == 'postgresql':
             conn.rollback()
+        print(f"Error adding user (trying fallback): {e}")
         # Fallback to old schema without first_name and last_name
         try:
             if DB_TYPE == 'postgresql':
@@ -358,339 +386,569 @@ def add_user(user_id, username, referrer_id=0, first_name=None, last_name=None):
         except Exception as e2:
             if DB_TYPE == 'postgresql':
                 conn.rollback()
-            print(f"Error adding user: {e2}")
-    conn.commit()
+            print(f"Error adding user (fallback failed): {e2}")
 
 
 def get_user(user_id):
-    cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
-    return cursor.fetchone()
+    try:
+        return safe_fetchone("SELECT * FROM users WHERE id=?", (user_id,))
+    except Exception as e:
+        print(f"Error getting user {user_id}: {e}")
+        return None
 
 
 def get_all_users():
-    cursor.execute("SELECT * FROM users")
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM users")
+    except Exception as e:
+        print(f"Error getting all users: {e}")
+        return []
 
 
 def get_user_count():
-    cursor.execute("SELECT COUNT(*) as cnt FROM users")
-    return cursor.fetchone()["cnt"]
+    try:
+        row = safe_fetchone("SELECT COUNT(*) as cnt FROM users")
+        return row["cnt"] if row else 0
+    except Exception as e:
+        print(f"Error getting user count: {e}")
+        return 0
 
 
 def get_active_user_count():
     """Users who have at least one task"""
-    cursor.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM tasks")
-    return cursor.fetchone()["cnt"]
+    try:
+        row = safe_fetchone("SELECT COUNT(DISTINCT user_id) as cnt FROM tasks")
+        return row["cnt"] if row else 0
+    except Exception as e:
+        print(f"Error getting active user count: {e}")
+        return 0
 
 
 def get_total_balances():
-    cursor.execute("SELECT COALESCE(SUM(available),0) as avail, COALESCE(SUM(reserved),0) as res, COALESCE(SUM(referral_balance),0) as ref FROM users")
-    return cursor.fetchone()
+    try:
+        row = safe_fetchone("SELECT COALESCE(SUM(available),0) as avail, COALESCE(SUM(reserved),0) as res, COALESCE(SUM(referral_balance),0) as ref FROM users")
+        return row if row else {"avail": 0, "res": 0, "ref": 0}
+    except Exception as e:
+        print(f"Error getting total balances: {e}")
+        return {"avail": 0, "res": 0, "ref": 0}
 
 
 def update_user_balance(user_id, available=None, reserved=None, referral_balance=None):
     user = get_user(user_id)
     if not user:
         return
-    if available is not None:
-        cursor.execute("UPDATE users SET available=? WHERE id=?", (available, user_id))
-    if reserved is not None:
-        cursor.execute("UPDATE users SET reserved=? WHERE id=?", (reserved, user_id))
-    if referral_balance is not None:
-        cursor.execute("UPDATE users SET referral_balance=? WHERE id=?", (referral_balance, user_id))
-    conn.commit()
+    try:
+        if available is not None:
+            execute_query("UPDATE users SET available=? WHERE id=?", (available, user_id))
+        if reserved is not None:
+            execute_query("UPDATE users SET reserved=? WHERE id=?", (reserved, user_id))
+        if referral_balance is not None:
+            execute_query("UPDATE users SET referral_balance=? WHERE id=?", (referral_balance, user_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating user balance: {e}")
 
 
 def add_to_reserved(user_id, amount):
-    cursor.execute("UPDATE users SET reserved = reserved + ? WHERE id=?", (amount, user_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET reserved = reserved + ? WHERE id=?", (amount, user_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error adding to reserved: {e}")
 
 
 def add_to_available(user_id, amount):
-    cursor.execute("UPDATE users SET available = available + ? WHERE id=?", (amount, user_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET available = available + ? WHERE id=?", (amount, user_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error adding to available: {e}")
 
 
 def add_to_referral_balance(user_id, amount):
-    cursor.execute("UPDATE users SET referral_balance = referral_balance + ? WHERE id=?", (amount, user_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET referral_balance = referral_balance + ? WHERE id=?", (amount, user_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error adding to referral balance: {e}")
 
 
 def clear_user_balance(user_id):
-    cursor.execute("UPDATE users SET available=0, reserved=0, referral_balance=0 WHERE id=?", (user_id,))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET available=0, reserved=0, referral_balance=0 WHERE id=?", (user_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error clearing user balance: {e}")
 
 
 def move_reserved_to_available(user_id, amount):
-    cursor.execute("UPDATE users SET reserved = reserved - ?, available = available + ? WHERE id=?",
-                   (amount, amount, user_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET reserved = reserved - ?, available = available + ? WHERE id=?",
+                       (amount, amount, user_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error moving reserved to available: {e}")
 
 
 # ---- Tasks ----
 def create_task(user_id, price):
-    cursor.execute("INSERT INTO tasks (user_id, price, description) VALUES (?, ?, ?)",
-                   (user_id, price, "مهمة جديدة"))
-    conn.commit()
-    return cursor.lastrowid
+    try:
+        execute_query("INSERT INTO tasks (user_id, price, description) VALUES (?, ?, ?)",
+                       (user_id, price, "مهمة جديدة"))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error creating task: {e}")
+        return None
 
 
 def get_task(task_id):
-    cursor.execute("SELECT * FROM tasks WHERE id=?", (task_id,))
-    return cursor.fetchone()
+    try:
+        return safe_fetchone("SELECT * FROM tasks WHERE id=?", (task_id,))
+    except Exception as e:
+        print(f"Error getting task {task_id}: {e}")
+        return None
 
 
 def get_user_tasks(user_id):
-    cursor.execute("SELECT * FROM tasks WHERE user_id=? ORDER BY created_at DESC", (user_id,))
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM tasks WHERE user_id=? ORDER BY created_at DESC", (user_id,))
+    except Exception as e:
+        print(f"Error getting user tasks: {e}")
+        return []
 
 
 def get_pending_tasks():
     """Tasks waiting for admin to send data or review"""
-    cursor.execute("SELECT * FROM tasks WHERE status IN ('pending', 'proof_submitted', 'error_resubmitted') ORDER BY created_at ASC")
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM tasks WHERE status IN ('pending', 'proof_submitted', 'error_resubmitted') ORDER BY created_at ASC")
+    except Exception as e:
+        print(f"Error getting pending tasks: {e}")
+        return []
 
 
 def update_task_status(task_id, status):
-    cursor.execute("UPDATE tasks SET status=? WHERE id=?", (status, task_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET status=? WHERE id=?", (status, task_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating task status: {e}")
 
 
 def update_task_admin_data(task_id, data):
-    cursor.execute("UPDATE tasks SET admin_data=?, status='data_sent' WHERE id=?", (data, task_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET admin_data=?, status='data_sent' WHERE id=?", (data, task_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating task admin data: {e}")
 
 
 def update_task_proof(task_id, file_id):
-    cursor.execute("UPDATE tasks SET proof_file_id=?, status='proof_submitted' WHERE id=?", (file_id, task_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET proof_file_id=?, status='proof_submitted' WHERE id=?", (file_id, task_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating task proof: {e}")
 
 
 def update_task_error_resubmit(task_id, file_id):
-    cursor.execute("UPDATE tasks SET proof_file_id=?, status='error_resubmitted' WHERE id=?", (file_id, task_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET proof_file_id=?, status='error_resubmitted' WHERE id=?", (file_id, task_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating task error resubmit: {e}")
 
 
 def approve_task(task_id):
-    now = datetime.datetime.now()
-    reserved_until = now + datetime.timedelta(hours=48)
-    cursor.execute("UPDATE tasks SET status='approved', completed_at=?, reserved_until=? WHERE id=?",
-                   (now.isoformat(), reserved_until.isoformat(), task_id))
-    conn.commit()
+    try:
+        now = datetime.datetime.now()
+        reserved_until = now + datetime.timedelta(hours=48)
+        execute_query("UPDATE tasks SET status='approved', completed_at=?, reserved_until=? WHERE id=?",
+                       (now.isoformat(), reserved_until.isoformat(), task_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error approving task: {e}")
 
 
 def reject_task(task_id):
-    cursor.execute("UPDATE tasks SET status='rejected' WHERE id=?", (task_id,))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET status='rejected' WHERE id=?", (task_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error rejecting task: {e}")
 
 
 def cancel_task(task_id):
-    cursor.execute("UPDATE tasks SET status='cancelled' WHERE id=?", (task_id,))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET status='cancelled' WHERE id=?", (task_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error cancelling task: {e}")
 
 
 def set_task_error(task_id, note):
-    cursor.execute("UPDATE tasks SET status='error', error_note=? WHERE id=?", (note, task_id))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET status='error', error_note=? WHERE id=?", (note, task_id))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error setting task error: {e}")
 
 
 def get_tasks_ready_to_release():
     """Tasks where 48h have passed and status is approved"""
-    now = datetime.datetime.now().isoformat()
-    cursor.execute("SELECT * FROM tasks WHERE status='approved' AND reserved_until <= ?", (now,))
-    return cursor.fetchall()
+    try:
+        now = datetime.datetime.now().isoformat()
+        return safe_fetchall("SELECT * FROM tasks WHERE status='approved' AND reserved_until <= ?", (now,))
+    except Exception as e:
+        print(f"Error getting tasks ready to release: {e}")
+        return []
 
 
 def get_user_task_stats(user_id):
-    cursor.execute("SELECT COUNT(*) as total FROM tasks WHERE user_id=?", (user_id,))
-    total = cursor.fetchone()["total"]
-    cursor.execute("SELECT COUNT(*) as approved FROM tasks WHERE user_id=? AND status='approved'", (user_id,))
-    approved = cursor.fetchone()["approved"]
-    cursor.execute("SELECT COUNT(*) as released FROM tasks WHERE user_id=? AND status='released'", (user_id,))
-    released = cursor.fetchone()["released"]
-    cursor.execute("SELECT COUNT(*) as rejected FROM tasks WHERE user_id=? AND status='rejected'", (user_id,))
-    rejected = cursor.fetchone()["rejected"]
-    return {"total": total, "approved": approved + released, "rejected": rejected}
+    try:
+        row = safe_fetchone("SELECT COUNT(*) as total FROM tasks WHERE user_id=?", (user_id,))
+        total = row["total"] if row else 0
+        
+        row = safe_fetchone("SELECT COUNT(*) as approved FROM tasks WHERE user_id=? AND status='approved'", (user_id,))
+        approved = row["approved"] if row else 0
+        
+        row = safe_fetchone("SELECT COUNT(*) as released FROM tasks WHERE user_id=? AND status='released'", (user_id,))
+        released = row["released"] if row else 0
+        
+        row = safe_fetchone("SELECT COUNT(*) as rejected FROM tasks WHERE user_id=? AND status='rejected'", (user_id,))
+        rejected = row["rejected"] if row else 0
+        
+        return {"total": total, "approved": approved + released, "rejected": rejected}
+    except Exception as e:
+        print(f"Error getting user task stats: {e}")
+        return {"total": 0, "approved": 0, "rejected": 0}
 
 
 def release_task(task_id):
-    cursor.execute("UPDATE tasks SET status='released' WHERE id=?", (task_id,))
-    conn.commit()
+    try:
+        execute_query("UPDATE tasks SET status='released' WHERE id=?", (task_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error releasing task: {e}")
 
 
 def get_reserved_tasks():
     """Tasks that are approved but not yet released (48h not passed or waiting admin)"""
-    cursor.execute("SELECT * FROM tasks WHERE status='approved' ORDER BY reserved_until ASC")
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM tasks WHERE status='approved' ORDER BY reserved_until ASC")
+    except Exception as e:
+        print(f"Error getting reserved tasks: {e}")
+        return []
 
 
 def get_reserved_tasks_by_user(user_id):
     """Get all reserved tasks for a specific user"""
-    cursor.execute("SELECT * FROM tasks WHERE status='approved' AND user_id=? ORDER BY reserved_until ASC", (user_id,))
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM tasks WHERE status='approved' AND user_id=? ORDER BY reserved_until ASC", (user_id,))
+    except Exception as e:
+        print(f"Error getting reserved tasks by user: {e}")
+        return []
 
 
 # ---- Withdrawals ----
 def create_withdrawal(user_id, method, data, amount):
-    cursor.execute("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?)",
-                   (user_id, method, data, amount))
-    conn.commit()
-    return cursor.lastrowid
+    try:
+        execute_query("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?)",
+                       (user_id, method, data, amount))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error creating withdrawal: {e}")
+        return None
 
 
 def get_withdrawal(wid):
-    cursor.execute("SELECT * FROM withdrawals WHERE id=?", (wid,))
-    return cursor.fetchone()
+    try:
+        return safe_fetchone("SELECT * FROM withdrawals WHERE id=?", (wid,))
+    except Exception as e:
+        print(f"Error getting withdrawal: {e}")
+        return None
 
 
 def get_pending_withdrawals():
-    cursor.execute("SELECT * FROM withdrawals WHERE status='pending' ORDER BY created_at ASC")
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM withdrawals WHERE status='pending' ORDER BY created_at ASC")
+    except Exception as e:
+        print(f"Error getting pending withdrawals: {e}")
+        return []
 
 
 def get_user_withdrawals(user_id):
-    cursor.execute("SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC", (user_id,))
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC", (user_id,))
+    except Exception as e:
+        print(f"Error getting user withdrawals: {e}")
+        return []
 
 
 def approve_withdrawal(wid):
-    cursor.execute("UPDATE withdrawals SET status='approved' WHERE id=?", (wid,))
-    conn.commit()
+    try:
+        execute_query("UPDATE withdrawals SET status='approved' WHERE id=?", (wid,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error approving withdrawal: {e}")
 
 
 def reject_withdrawal(wid):
-    w = get_withdrawal(wid)
-    if w:
-        # Return balance to user
-        add_to_available(w["user_id"], w["amount"])
-        cursor.execute("UPDATE withdrawals SET status='rejected' WHERE id=?", (wid,))
-        conn.commit()
+    try:
+        w = get_withdrawal(wid)
+        if w:
+            # Return balance to user
+            add_to_available(w["user_id"], w["amount"])
+            execute_query("UPDATE withdrawals SET status='rejected' WHERE id=?", (wid,))
+            conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error rejecting withdrawal: {e}")
 
 
 def set_withdrawal_receipt(wid, file_id):
-    cursor.execute("UPDATE withdrawals SET receipt_file_id=? WHERE id=?", (file_id, wid))
-    conn.commit()
+    try:
+        execute_query("UPDATE withdrawals SET receipt_file_id=? WHERE id=?", (file_id, wid))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error setting withdrawal receipt: {e}")
 
 
 # ---- Referrals ----
 def add_referral(referrer_id, referred_id):
-    execute_query("SELECT * FROM referrals WHERE referrer_id=? AND referred_id=?", (referrer_id, referred_id))
-    if not cursor.fetchone():
-        execute_query("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-        conn.commit()
+    try:
+        row = safe_fetchone("SELECT * FROM referrals WHERE referrer_id=? AND referred_id=?", (referrer_id, referred_id))
+        if not row:
+            execute_query("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
+            conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error adding referral: {e}")
 
 
 def get_referral_count(user_id):
-    execute_query("SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id=?", (user_id,))
-    return cursor.fetchone()["cnt"]
+    try:
+        row = safe_fetchone("SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id=?", (user_id,))
+        return row["cnt"] if row else 0
+    except Exception as e:
+        print(f"Error getting referral count: {e}")
+        return 0
 
 
 def get_user_referrals(user_id):
     """Get all referrals for a user"""
-    execute_query("SELECT * FROM referrals WHERE referrer_id=? ORDER BY created_at DESC", (user_id,))
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM referrals WHERE referrer_id=? ORDER BY created_at DESC", (user_id,))
+    except Exception as e:
+        print(f"Error getting user referrals: {e}")
+        return []
 
 
 def get_referral_completed_tasks(referrer_id):
     """Count tasks completed by referred users"""
-    cursor.execute("""
-        SELECT COUNT(*) as cnt FROM tasks t
-        JOIN referrals r ON t.user_id = r.referred_id
-        WHERE r.referrer_id = ? AND t.status IN ('approved', 'released')
-    """, (referrer_id,))
-    return cursor.fetchone()["cnt"]
+    try:
+        row = safe_fetchone("""
+            SELECT COUNT(*) as cnt FROM tasks t
+            JOIN referrals r ON t.user_id = r.referred_id
+            WHERE r.referrer_id = ? AND t.status IN ('approved', 'released')
+        """, (referrer_id,))
+        return row["cnt"] if row else 0
+    except Exception as e:
+        print(f"Error getting referral completed tasks: {e}")
+        return 0
 
 
 def get_leaderboard():
     """Get referral leaderboard sorted by referral count"""
-    cursor.execute("""
-        SELECT r.referrer_id, u.username, COUNT(r.referred_id) as ref_count,
-        (SELECT COUNT(*) FROM tasks t2 JOIN referrals r2 ON t2.user_id = r2.referred_id
-         WHERE r2.referrer_id = r.referrer_id AND t2.status IN ('approved','released')) as task_count
-        FROM referrals r
-        JOIN users u ON r.referrer_id = u.id
-        GROUP BY r.referrer_id
-        ORDER BY ref_count DESC
-    """)
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("""
+            SELECT r.referrer_id, u.username, COUNT(r.referred_id) as ref_count,
+            (SELECT COUNT(*) FROM tasks t2 JOIN referrals r2 ON t2.user_id = r2.referred_id
+             WHERE r2.referrer_id = r.referrer_id AND t2.status IN ('approved','released')) as task_count
+            FROM referrals r
+            JOIN users u ON r.referrer_id = u.id
+            GROUP BY r.referrer_id
+            ORDER BY ref_count DESC
+        """)
+    except Exception as e:
+        print(f"Error getting leaderboard: {e}")
+        return []
 
 
 # ---- Admins ----
 def add_admin(admin_id):
-    if DB_TYPE == 'postgresql':
-        execute_query("INSERT INTO admins (id) VALUES (?) ON CONFLICT (id) DO NOTHING", (admin_id,))
-    else:
-        cursor.execute("INSERT OR IGNORE INTO admins (id) VALUES (?)", (admin_id,))
-    conn.commit()
+    try:
+        if DB_TYPE == 'postgresql':
+            execute_query("INSERT INTO admins (id) VALUES (?) ON CONFLICT (id) DO NOTHING", (admin_id,))
+        else:
+            cursor.execute("INSERT OR IGNORE INTO admins (id) VALUES (?)", (admin_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error adding admin: {e}")
 
 
 def remove_admin(admin_id):
-    cursor.execute("DELETE FROM admins WHERE id=?", (admin_id,))
-    conn.commit()
+    try:
+        execute_query("DELETE FROM admins WHERE id=?", (admin_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error removing admin: {e}")
 
 
 def get_admins():
-    cursor.execute("SELECT id FROM admins")
-    return [row["id"] for row in cursor.fetchall()]
+    try:
+        rows = safe_fetchall("SELECT id FROM admins")
+        return [row["id"] for row in rows]
+    except Exception as e:
+        print(f"Error getting admins: {e}")
+        return []
 
 
 def is_admin(user_id, main_admin_id):
     if user_id == main_admin_id:
         return True
-    cursor.execute("SELECT id FROM admins WHERE id=?", (user_id,))
-    return cursor.fetchone() is not None
+    try:
+        row = safe_fetchone("SELECT id FROM admins WHERE id=?", (user_id,))
+        return row is not None
+    except Exception as e:
+        print(f"Error checking admin: {e}")
+        return False
 
 
 # ---- Withdrawal Methods ----
 def get_withdrawal_methods():
-    cursor.execute("SELECT * FROM withdrawal_methods")
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM withdrawal_methods")
+    except Exception as e:
+        print(f"Error getting withdrawal methods: {e}")
+        return []
 
 
 def get_withdrawal_method(name):
-    execute_query("SELECT * FROM withdrawal_methods WHERE name=?", (name,))
-    return cursor.fetchone()
+    try:
+        return safe_fetchone("SELECT * FROM withdrawal_methods WHERE name=?", (name,))
+    except Exception as e:
+        print(f"Error getting withdrawal method: {e}")
+        return None
 
 
 def add_withdrawal_method(name, min_amount=0, fee=0):
-    execute_insert_or_ignore('withdrawal_methods', {'name': name, 'min_amount': min_amount, 'fee': fee})
+    try:
+        execute_insert_or_ignore('withdrawal_methods', {'name': name, 'min_amount': min_amount, 'fee': fee})
+    except Exception as e:
+        print(f"Error adding withdrawal method: {e}")
 
 
 def update_withdrawal_method_min(name, min_amount):
-    execute_query("UPDATE withdrawal_methods SET min_amount=? WHERE name=?", (min_amount, name))
-    conn.commit()
+    try:
+        execute_query("UPDATE withdrawal_methods SET min_amount=? WHERE name=?", (min_amount, name))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating withdrawal method min: {e}")
 
 
 def update_withdrawal_method_fee(name, fee):
-    execute_query("UPDATE withdrawal_methods SET fee=? WHERE name=?", (fee, name))
-    conn.commit()
+    try:
+        execute_query("UPDATE withdrawal_methods SET fee=? WHERE name=?", (fee, name))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error updating withdrawal method fee: {e}")
 
 
 # ---- Ban/Unban Users ----
 def ban_user(user_id):
-    cursor.execute("UPDATE users SET is_banned=1 WHERE id=?", (user_id,))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET is_banned=1 WHERE id=?", (user_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error banning user: {e}")
 
 
 def unban_user(user_id):
-    cursor.execute("UPDATE users SET is_banned=0 WHERE id=?", (user_id,))
-    conn.commit()
+    try:
+        execute_query("UPDATE users SET is_banned=0 WHERE id=?", (user_id,))
+        conn.commit()
+    except Exception as e:
+        if DB_TYPE == 'postgresql':
+            conn.rollback()
+        print(f"Error unbanning user: {e}")
 
 
 def is_user_banned(user_id):
-    cursor.execute("SELECT is_banned FROM users WHERE id=?", (user_id,))
-    row = cursor.fetchone()
-    return row["is_banned"] == 1 if row else False
+    try:
+        row = safe_fetchone("SELECT is_banned FROM users WHERE id=?", (user_id,))
+        return row["is_banned"] == 1 if row else False
+    except Exception as e:
+        print(f"Error checking if user is banned: {e}")
+        return False
 
 
 # ---- Get all user IDs ----
 def get_all_user_ids():
-    cursor.execute("SELECT id FROM users")
-    return [row["id"] for row in cursor.fetchall()]
+    try:
+        rows = safe_fetchall("SELECT id FROM users")
+        return [row["id"] for row in rows]
+    except Exception as e:
+        print(f"Error getting all user IDs: {e}")
+        return []
 
 
 # ---- Get incomplete tasks ----
 def get_incomplete_tasks():
     """Tasks that are not completed (pending, data_sent, proof_submitted, error, error_resubmitted)"""
-    cursor.execute("SELECT * FROM tasks WHERE status IN ('pending', 'data_sent', 'proof_submitted', 'error', 'error_resubmitted') ORDER BY created_at DESC")
-    return cursor.fetchall()
+    try:
+        return safe_fetchall("SELECT * FROM tasks WHERE status IN ('pending', 'data_sent', 'proof_submitted', 'error', 'error_resubmitted') ORDER BY created_at DESC")
+    except Exception as e:
+        print(f"Error getting incomplete tasks: {e}")
+        return []

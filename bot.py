@@ -431,16 +431,42 @@ def main():
         print("Set it with: export TELEGRAM_BOT_TOKEN=your_token_here")
         return
 
-    db.init_db()
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("menu", menu_command))
-    app.add_handler(CallbackQueryHandler(callback_router))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.VIDEO, handle_video))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("البوت بدأ يشتغل...")
-    app.run_polling()
+    print("=" * 50)
+    print("Starting Bot...")
+    print("=" * 50)
+    
+    try:
+        print("Initializing database...")
+        db.init_db()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"❌ Error initializing database: {e}")
+        import traceback
+        traceback.print_exc()
+        return
+    
+    try:
+        print("Building application...")
+        app = ApplicationBuilder().token(TOKEN).build()
+        
+        print("Adding handlers...")
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("menu", menu_command))
+        app.add_handler(CallbackQueryHandler(callback_router))
+        app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+        app.add_handler(MessageHandler(filters.VIDEO, handle_video))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        print("=" * 50)
+        print("✅ Bot started successfully!")
+        print("=" * 50)
+        print("البوت بدأ يشتغل...")
+        
+        app.run_polling()
+    except Exception as e:
+        print(f"❌ Error starting bot: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

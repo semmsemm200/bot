@@ -323,24 +323,47 @@ async def admin_reserved_user_tasks(update: Update, context: ContextTypes.DEFAUL
     keyboard = []
     for t in tasks:
         try:
+            # Convert task to dict if needed
+            task_dict = dict(t) if hasattr(t, 'keys') else t
+            task_id = task_dict.get('id', 0)
+            price = task_dict.get('price', 0)
+            completed_at_str = task_dict.get('completed_at')
+            reserved_until_str = task_dict.get('reserved_until')
+            
             # Calculate time passed since approval
-            if t.get('completed_at'):
+            time_info = "⏱️ غير محدد"
+            if completed_at_str:
                 try:
-                    completed_at = datetime.fromisoformat(str(t['completed_at']))
+                    # Handle both datetime objects and strings
+                    if isinstance(completed_at_str, str):
+                        # Remove timezone info if present for parsing
+                        completed_at_str = completed_at_str.replace('+00:00', '').replace('Z', '').split('.')[0]
+                        completed_at = datetime.fromisoformat(completed_at_str)
+                    else:
+                        completed_at = completed_at_str
+                    
                     now = datetime.now()
                     time_passed = now - completed_at
                     hours_passed = int(time_passed.total_seconds() // 3600)
                     minutes_passed = int((time_passed.total_seconds() % 3600) // 60)
                     time_info = f"⏱️ مر {hours_passed} ساعة و {minutes_passed} دقيقة"
-                except:
+                except Exception as e:
+                    print(f"Error parsing completed_at for task {task_id}: {e}")
                     time_info = "⏱️ غير محدد"
-            else:
-                time_info = "⏱️ غير محدد"
             
             # Time remaining
-            if t.get('reserved_until'):
+            time_remaining = "✅ جاهز للتحرير"
+            status_emoji = "🟢"
+            if reserved_until_str:
                 try:
-                    reserved_until = datetime.fromisoformat(str(t['reserved_until']))
+                    # Handle both datetime objects and strings
+                    if isinstance(reserved_until_str, str):
+                        # Remove timezone info if present for parsing
+                        reserved_until_str = reserved_until_str.replace('+00:00', '').replace('Z', '').split('.')[0]
+                        reserved_until = datetime.fromisoformat(reserved_until_str)
+                    else:
+                        reserved_until = reserved_until_str
+                    
                     now = datetime.now()
                     time_diff = reserved_until - now
                     
@@ -349,37 +372,44 @@ async def admin_reserved_user_tasks(update: Update, context: ContextTypes.DEFAUL
                         minutes_remaining = int((time_diff.total_seconds() % 3600) // 60)
                         time_remaining = f"⏰ باقي {hours_remaining}س {minutes_remaining}د"
                         status_emoji = "🟡"
-                    else:
-                        time_remaining = "✅ جاهز للتحرير"
-                        status_emoji = "🟢"
-                except:
-                    time_remaining = "✅ جاهز للتحرير"
-                    status_emoji = "🟢"
-            else:
-                time_remaining = "✅ جاهز للتحرير"
-                status_emoji = "🟢"
+                except Exception as e:
+                    print(f"Error parsing reserved_until for task {task_id}: {e}")
             
             msg += (
-                f"{status_emoji} المهمة #{t['id']}\n"
-                f"💰 المبلغ: {t['price']} جنيه\n"
+                f"{status_emoji} المهمة #{task_id}\n"
+                f"💰 المبلغ: {price} جنيه\n"
                 f"{time_info}\n"
                 f"{time_remaining}\n\n"
             )
             
             keyboard.append([
-                InlineKeyboardButton(f"📋 تفاصيل #{t['id']}", callback_data=f"admin_task_details_{t['id']}"),
-                InlineKeyboardButton(f"✅ تحرير #{t['id']}", callback_data=f"admin_release_{t['id']}")
+                InlineKeyboardButton(f"📋 تفاصيل #{task_id}", callback_data=f"admin_task_details_{task_id}"),
+                InlineKeyboardButton(f"✅ تحرير #{task_id}", callback_data=f"admin_release_{task_id}")
             ])
         except Exception as e:
-            print(f"Error processing task {t.get('id')}: {e}")
-            continue
+            print(f"Error processing task: {e}")
+            # Still try to show the task with minimal info
+            try:
+                task_dict = dict(t) if hasattr(t, 'keys') else t
+                task_id = task_dict.get('id', 0)
+                price = task_dict.get('price', 0)
+                msg += f"⚠️ المهمة #{task_id} - {price} جنيه (خطأ في البيانات)\n\n"
+                keyboard.append([
+                    InlineKeyboardButton(f"✅ تحرير #{task_id}", callback_data=f"admin_release_{task_id}")
+                ])
+            except:
+                continue
     
     # Add option to release all tasks for this user
-    total_amount = sum(t['price'] for t in tasks)
-    keyboard.append([InlineKeyboardButton(
-        f"✅ تحرير الكل ({len(tasks)} مهمة - {total_amount} جنيه)",
-        callback_data=f"admin_release_all_{user_id}"
-    )])
+    try:
+        total_amount = sum(dict(t).get('price', 0) if hasattr(t, 'keys') else t.get('price', 0) for t in tasks)
+        keyboard.append([InlineKeyboardButton(
+            f"✅ تحرير الكل ({len(tasks)} مهمة - {total_amount} جنيه)",
+            callback_data=f"admin_release_all_{user_id}"
+        )])
+    except:
+        pass
+    
     keyboard.append([InlineKeyboardButton("🔙 قائمة المستخدمين", callback_data="admin_reserved")])
     
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -467,11 +497,9 @@ async def admin_release_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await admin_reserved_user_tasks(update, context)
     except Exception as e:
         await query.answer(f"❌ خطأ: {str(e)}", show_alert=True)
-    
-    # Go back to user's tasks list
-    # Simulate callback data to show user tasks again
-    query.data = f"admin_reserved_user_{task['user_id']}"
-    await admin_reserved_user_tasks(update, context)
+        # Still try to go back to the list
+        query.data = f"admin_reserved_user_{user_id}"
+        await admin_reserved_user_tasks(update, context)
 
 
 async def admin_task_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -490,7 +518,7 @@ async def admin_task_details(update: Update, context: ContextTypes.DEFAULT_TYPE)
     from datetime import datetime
     
     # Convert to dict
-    task_dict = dict(task)
+    task_dict = dict(task) if hasattr(task, 'keys') else task
     
     # Get user info
     user = db.get_user(task_dict['user_id'])
@@ -499,19 +527,30 @@ async def admin_task_details(update: Update, context: ContextTypes.DEFAULT_TYPE)
     display_name = username if username else str(task_dict['user_id'])
     
     # Calculate time
-    if task_dict.get('reserved_until'):
-        reserved_until = datetime.fromisoformat(task_dict['reserved_until'])
-        now = datetime.now()
-        time_diff = reserved_until - now
-        
-        if time_diff.total_seconds() > 0:
-            hours = int(time_diff.total_seconds() // 3600)
-            minutes = int((time_diff.total_seconds() % 3600) // 60)
-            time_status = f"⏰ باقي: {hours} ساعة و {minutes} دقيقة"
-        else:
+    time_status = "غير محدد"
+    reserved_until_str = task_dict.get('reserved_until')
+    if reserved_until_str:
+        try:
+            # Handle both datetime objects and strings
+            if isinstance(reserved_until_str, str):
+                # Remove timezone info if present for parsing
+                reserved_until_str = reserved_until_str.replace('+00:00', '').replace('Z', '').split('.')[0]
+                reserved_until = datetime.fromisoformat(reserved_until_str)
+            else:
+                reserved_until = reserved_until_str
+            
+            now = datetime.now()
+            time_diff = reserved_until - now
+            
+            if time_diff.total_seconds() > 0:
+                hours = int(time_diff.total_seconds() // 3600)
+                minutes = int((time_diff.total_seconds() % 3600) // 60)
+                time_status = f"⏰ باقي: {hours} ساعة و {minutes} دقيقة"
+            else:
+                time_status = "✅ جاهز للتحرير الآن"
+        except Exception as e:
+            print(f"Error parsing reserved_until in task_details: {e}")
             time_status = "✅ جاهز للتحرير الآن"
-    else:
-        time_status = "غير محدد"
     
     # Build detailed message
     msg = (
@@ -537,7 +576,7 @@ async def admin_task_details(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     keyboard = [
         [InlineKeyboardButton("✅ تحرير الرصيد الآن", callback_data=f"admin_release_{task_id}")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="admin_reserved")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data=f"admin_reserved_user_{task_dict['user_id']}")]
     ]
     
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
