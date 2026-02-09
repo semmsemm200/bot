@@ -68,6 +68,15 @@ def init_db():
             fee INTEGER DEFAULT 0
         );
     ''')
+    
+    # Add is_banned column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        # Column already exists
+        pass
+    
     conn.commit()
 
     # Default settings
