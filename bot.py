@@ -7,7 +7,10 @@ from handlers_user import (
     admin_approve_task, admin_reject_task, admin_error_task,
     balance, my_tasks, withdraw, withdraw_method_selected,
     withdrawal_history, referrals, leaderboard, withdraw_referral,
-    help_cmd, tutorial
+    help_cmd, tutorial,
+    new_task_text, balance_text, my_tasks_text, withdraw_text,
+    referrals_text, withdraw_referral_text, tutorial_text, help_text,
+    admin_panel_text
 )
 from handlers_admin import (
     admin_panel, admin_pending_tasks, admin_withdrawals,
@@ -116,8 +119,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Default
-    await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
+    # Handle keyboard button presses
+    if text == "📋 طلب مهمة جديدة":
+        await new_task_text(update, context)
+    elif text == "💰 رصيدي":
+        await balance_text(update, context)
+    elif text == "📊 مهامي":
+        await my_tasks_text(update, context)
+    elif text == "💸 سحب الأرباح":
+        await withdraw_text(update, context)
+    elif text == "👥 الإحالات":
+        await referrals_text(update, context)
+    elif text == "💎 سحب رصيد الإحالات":
+        await withdraw_referral_text(update, context)
+    elif text == "🎬 طريقة عمل المهمة":
+        await tutorial_text(update, context)
+    elif text == "ℹ️ مساعدة":
+        await help_text(update, context)
+    elif text == "🔧 لوحة الإدارة" and is_admin(user_id):
+        await admin_panel_text(update, context)
+    else:
+        # Default
+        await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
 
 
 # ==================== PHOTO HANDLER ====================

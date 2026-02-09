@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from config import CHANNEL_ID, CHANNEL_LINK, ADMIN_ID
 import db
@@ -47,15 +47,11 @@ def bot_is_active():
 
 def get_main_menu_keyboard(user_id):
     keyboard = [
-        [InlineKeyboardButton("📋 طلب مهمة جديدة", callback_data="new_task"),
-         InlineKeyboardButton("💰 رصيدي", callback_data="balance")],
-        [InlineKeyboardButton("📊 مهامي", callback_data="my_tasks"),
-         InlineKeyboardButton("💸 سحب الأرباح", callback_data="withdraw")],
-        [InlineKeyboardButton("👥 الإحالات", callback_data="referrals"),
-         InlineKeyboardButton("💎 سحب رصيد الإحالات", callback_data="withdraw_referral")],
-        [InlineKeyboardButton("🎬 طريقة عمل المهمة", callback_data="tutorial"),
-         InlineKeyboardButton("ℹ️ مساعدة", callback_data="help")],
+        [KeyboardButton("📋 طلب مهمة جديدة"), KeyboardButton("💰 رصيدي")],
+        [KeyboardButton("📊 مهامي"), KeyboardButton("💸 سحب الأرباح")],
+        [KeyboardButton("👥 الإحالات"), KeyboardButton("💎 سحب رصيد الإحالات")],
+        [KeyboardButton("🎬 طريقة عمل المهمة"), KeyboardButton("ℹ️ مساعدة")],
     ]
     if is_admin(user_id):
-        keyboard.append([InlineKeyboardButton("🔧 لوحة الإدارة", callback_data="admin_panel")])
-    return InlineKeyboardMarkup(keyboard)
+        keyboard.append([KeyboardButton("🔧 لوحة الإدارة")])
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

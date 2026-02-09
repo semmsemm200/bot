@@ -491,3 +491,188 @@ async def tutorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_video(query.from_user.id, video_id, caption="🎬 فيديو شرح طريقة عمل المهمة")
     else:
         await context.bot.send_message(query.from_user.id, "⚠️ لم يتم تحديد فيديو الشرح بعد.")
+
+
+
+# ==================== TEXT HANDLERS FOR KEYBOARD BUTTONS ====================
+async def new_task_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if db.is_user_banned(user_id):
+        await update.message.reply_text("⛔ تم حظرك من استخدام البوت.")
+        return
+    if not bot_is_active():
+        await update.message.reply_text("⚠️ البوت متوقف حالياً. يرجى المحاولة لاحقاً.")
+        return
+    price = int(db.get_setting("task_price") or 10)
+    task_id = db.create_task(user_id, price)
+    await update.message.reply_text(
+        f"✅ تم طلب مهمة جديدة.\n"
+        f"💰 سعر المهمة: {price} جنيه\n"
+        f"⏳ في انتظار بيانات المهمة من المشرف..."
+    )
+    keyboard = [[InlineKeyboardButton("📤 إرسال بيانات المهمة", callback_data=f"admin_send_data_{task_id}")]]
+    await send_to_admins(context,
+        f"📋 طلب مهمة جديدة\n"
+        f"👤 المستخدم: {user_id}\n"
+        f"🆔 Task ID: {task_id}\n"
+        f"💰 السعر: {price} جنيه\n\n"
+        f"يرجى إرسال بيانات المهمة.",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def balance_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = db.get_user(user_id)
+    if not user:
+        await update.message.reply_text("⚠️ لم يتم العثور على حسابك.")
+        return
+    msg = (
+        f"🆔 ID: {user['id']}\n"
+        f"💰 رصيد متاح: {user['available']} جنيه\n"
+        f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
+        f"👥 رصيد الإحالات: {user['referral_balance']} جنيه\n\n"
+        f"⏳ الرصيد المحجوز يتحول لرصيد متاح بعد 48 ساعة."
+    )
+    keyboard = [[InlineKeyboardButton("📜 سجل السحوبات", callback_data="withdrawal_history")]]
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def my_tasks_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    stats = db.get_user_task_stats(user_id)
+    tasks_list = db.get_user_tasks(user_id)
+    msg = (
+        f"📊 إحصائيات مهامك:\n"
+        f"📋 إجمالي المهام: {stats['total']}\n"
+        f"✅ مهام مقبولة: {stats['approved']}\n"
+        f"❌ مهام مرفوضة: {stats['rejected']}\n\n"
+    )
+    if tasks_list:
+        msg += "📝 آخر المهام:\n"
+        status_map = {
+            "pending": "⏳ معلقة",
+            "data_sent": "📤 بيانات مرسلة",
+            "proof_submitted": "📸 إثبات مرسل",
+            "approved": "✅ مقبولة (محجوز)",
+            "released": "✅ مقبولة (متاح)",
+            "rejected": "❌ مرفوضة",
+            "cancelled": "🚫 ملغاة",
+            "error": "⚠️ خطأ",
+            "error_resubmitted": "📸 إثبات معاد",
+        }
+        for t in tasks_list[:10]:
+            status_text = status_map.get(t["status"], t["status"])
+            msg += f"  #{t['id']} - {t['price']} جنيه - {status_text}\n"
+    await update.message.reply_text(msg)
+
+
+async def withdraw_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = db.get_user(user_id)
+    if not user:
+        await update.message.reply_text("⚠️ لم يتم العثور على حسابك.")
+        return
+    total_available = user["available"]
+    min_withdrawal = int(db.get_setting("min_withdrawal") or 50)
+    if total_available < min_withdrawal:
+        await update.message.reply_text(
+            f"⚠️ رصيدك المتاح ({total_available} جنيه) أقل من الحد الأدنى للسحب ({min_withdrawal} جنيه)."
+        )
+        return
+    methods = db.get_withdrawal_methods()
+    keyboard = []
+    for m in methods:
+        keyboard.append([InlineKeyboardButton(
+            f"{m['name']} (حد أدنى: {m['min_amount']})",
+            callback_data=f"wmethod_{m['name']}"
+        )])
+    await update.message.reply_text(
+        f"💸 رصيدك المتاح: {total_available} جنيه\nاختر طريقة السحب:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def referrals_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = db.get_user(user_id)
+    ref_count = db.get_referral_count(user_id)
+    ref_tasks = db.get_referral_completed_tasks(user_id)
+    ref_reward = int(db.get_setting("referral_reward") or 2)
+    bot_username = (await context.bot.get_me()).username
+    invite_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    keyboard = [
+        [InlineKeyboardButton("🏆 تصنيف الإحالات", callback_data="leaderboard")],
+    ]
+    msg = (
+        f"👥 الإحالات\n\n"
+        f"🔗 رابط الدعوة الخاص بك:\n{invite_link}\n\n"
+        f"👤 عدد الإحالات: {ref_count}\n"
+        f"📋 مهام المُحالين المكتملة: {ref_tasks}\n"
+        f"💰 رصيد الإحالات: {user['referral_balance']} جنيه\n"
+        f"🎁 مكافأة لكل مهمة يعملها المُحال: {ref_reward} جنيه"
+    )
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def withdraw_referral_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = db.get_user(user_id)
+    if not user or user["referral_balance"] <= 0:
+        await update.message.reply_text("⚠️ رصيد الإحالات فارغ!")
+        return
+    amount = user["referral_balance"]
+    db.add_to_available(user_id, amount)
+    db.update_user_balance(user_id, referral_balance=0)
+    await update.message.reply_text(
+        f"✅ تم تحويل {amount} جنيه من رصيد الإحالات إلى الرصيد المتاح.\n"
+        f"يمكنك سحبه من قائمة سحب الأرباح."
+    )
+
+
+async def tutorial_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    video_id = db.get_setting("tutorial_video_id")
+    if video_id:
+        await context.bot.send_video(update.effective_user.id, video_id, caption="🎬 فيديو شرح طريقة عمل المهمة")
+    else:
+        await update.message.reply_text("⚠️ لم يتم تحديد فيديو الشرح بعد.")
+
+
+async def help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "ℹ️ المساعدة\n\n"
+        "📋 طلب مهمة: اطلب مهمة جديدة لإنشاء حساب إيميل\n"
+        "💰 رصيدي: عرض رصيدك الحالي\n"
+        "📊 مهامي: عرض قائمة مهامك\n"
+        "💸 سحب الأرباح: طلب سحب الأرباح\n"
+        "👥 الإحالات: عرض رابط الإحالة الخاص بك\n"
+        "🎬 طريقة عمل المهمة: شاهد فيديو توضيحي\n\n"
+        "💡 كيف يعمل النظام:\n"
+        "1. اطلب مهمة جديدة\n"
+        "2. ستحصل على بيانات حساب لإنشائه\n"
+        "3. أنشئ الحساب وأرسل الإثبات\n"
+        "4. بعد الموافقة تحصل على المكافأة\n\n"
+        "📞 للدعم الفني: @gmailfarmermaxsupport"
+    )
+    await update.message.reply_text(msg)
+
+
+async def admin_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        return
+    keyboard = [
+        [InlineKeyboardButton("📋 المهام المعلقة", callback_data="admin_pending_tasks"),
+         InlineKeyboardButton("💸 طلبات السحب", callback_data="admin_withdrawals")],
+        [InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="admin_users"),
+         InlineKeyboardButton("🔒 الرصيد المحجوز", callback_data="admin_reserved")],
+        [InlineKeyboardButton("⚙️ الإعدادات", callback_data="admin_settings"),
+         InlineKeyboardButton("🔍 بحث عن مستخدم", callback_data="admin_search_user")],
+        [InlineKeyboardButton("🗑️ مسح رصيد مستخدم", callback_data="admin_clear_balance"),
+         InlineKeyboardButton("❌ إلغاء مهمة", callback_data="admin_cancel_task")],
+        [InlineKeyboardButton("🎁 المكافأة", callback_data="admin_reward_user"),
+         InlineKeyboardButton("🚫 حظر/رفع حظر", callback_data="admin_ban_user")],
+        [InlineKeyboardButton("👮 إدارة المشرفين", callback_data="admin_manage_admins"),
+         InlineKeyboardButton("🎬 فيديو الشرح", callback_data="admin_set_video")],
+    ]
+    await update.message.reply_text("🔧 لوحة الإدارة:", reply_markup=InlineKeyboardMarkup(keyboard))
