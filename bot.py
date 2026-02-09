@@ -94,6 +94,48 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ تم حفظ الخطأ لكن تعذر إرسال الإشعار: {str(e)}")
         return
 
+    # Admin: custom task price input
+    if context.user_data.get("admin_setting_task_price") and is_admin(user_id):
+        context.user_data.pop("admin_setting_task_price")
+        try:
+            price = int(text)
+            if price <= 0:
+                await update.message.reply_text("❌ يجب أن يكون السعر أكبر من صفر.")
+                return
+            db.set_setting("task_price", str(price))
+            await update.message.reply_text(f"✅ تم تغيير سعر المهمة إلى {price} جنيه")
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال رقم صحيح فقط.")
+        return
+
+    # Admin: custom referral reward input
+    if context.user_data.get("admin_setting_ref_reward") and is_admin(user_id):
+        context.user_data.pop("admin_setting_ref_reward")
+        try:
+            reward = int(text)
+            if reward < 0:
+                await update.message.reply_text("❌ يجب أن تكون المكافأة صفر أو أكبر.")
+                return
+            db.set_setting("referral_reward", str(reward))
+            await update.message.reply_text(f"✅ تم تغيير مكافأة الإحالة إلى {reward} جنيه")
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال رقم صحيح فقط.")
+        return
+
+    # Admin: custom min withdrawal input
+    if context.user_data.get("admin_setting_min_withdrawal") and is_admin(user_id):
+        context.user_data.pop("admin_setting_min_withdrawal")
+        try:
+            min_w = int(text)
+            if min_w <= 0:
+                await update.message.reply_text("❌ يجب أن يكون الحد الأدنى أكبر من صفر.")
+                return
+            db.set_setting("min_withdrawal", str(min_w))
+            await update.message.reply_text(f"✅ تم تغيير الحد الأدنى للسحب إلى {min_w} جنيه")
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال رقم صحيح فقط.")
+        return
+
     # User: withdrawal data
     if context.user_data.get("withdraw_method"):
         method_name = context.user_data.pop("withdraw_method")

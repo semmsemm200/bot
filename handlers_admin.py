@@ -375,6 +375,7 @@ async def admin_set_task_price(update: Update, context: ContextTypes.DEFAULT_TYP
          InlineKeyboardButton("20 جنيه", callback_data="admin_price_20")],
         [InlineKeyboardButton("25 جنيه", callback_data="admin_price_25"),
          InlineKeyboardButton("30 جنيه", callback_data="admin_price_30")],
+        [InlineKeyboardButton("✏️ إدخال مخصص", callback_data="admin_price_custom")],
         [InlineKeyboardButton("🔙 الإعدادات", callback_data="admin_settings")]
     ]
     await query.edit_message_text("💰 اختر سعر المهمة الجديد:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -384,6 +385,12 @@ async def admin_set_price_value(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     if not is_admin(query.from_user.id):
+        return
+    
+    # Check if custom input
+    if query.data == "admin_price_custom":
+        context.user_data["admin_setting_task_price"] = True
+        await query.edit_message_text("✏️ أرسل سعر المهمة الجديد (رقم فقط):")
         return
     
     price = int(query.data.split("_")[-1])
@@ -405,6 +412,7 @@ async def admin_set_ref_reward(update: Update, context: ContextTypes.DEFAULT_TYP
          InlineKeyboardButton("5 جنيه", callback_data="admin_ref_5")],
         [InlineKeyboardButton("10 جنيه", callback_data="admin_ref_10"),
          InlineKeyboardButton("15 جنيه", callback_data="admin_ref_15")],
+        [InlineKeyboardButton("✏️ إدخال مخصص", callback_data="admin_ref_custom")],
         [InlineKeyboardButton("🔙 الإعدادات", callback_data="admin_settings")]
     ]
     await query.edit_message_text("👥 اختر مكافأة الإحالة الجديدة:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -414,6 +422,12 @@ async def admin_set_ref_value(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     if not is_admin(query.from_user.id):
+        return
+    
+    # Check if custom input
+    if query.data == "admin_ref_custom":
+        context.user_data["admin_setting_ref_reward"] = True
+        await query.edit_message_text("✏️ أرسل مكافأة الإحالة الجديدة (رقم فقط):")
         return
     
     reward = int(query.data.split("_")[-1])
@@ -435,6 +449,7 @@ async def admin_set_min_w(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("100 جنيه", callback_data="admin_minw_100")],
         [InlineKeyboardButton("150 جنيه", callback_data="admin_minw_150"),
          InlineKeyboardButton("200 جنيه", callback_data="admin_minw_200")],
+        [InlineKeyboardButton("✏️ إدخال مخصص", callback_data="admin_minw_custom")],
         [InlineKeyboardButton("🔙 الإعدادات", callback_data="admin_settings")]
     ]
     await query.edit_message_text("💸 اختر الحد الأدنى للسحب الجديد:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -444,6 +459,13 @@ async def admin_set_minw_value(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     if not is_admin(query.from_user.id):
         await query.answer()
+        return
+    
+    # Check if custom input
+    if query.data == "admin_minw_custom":
+        context.user_data["admin_setting_min_withdrawal"] = True
+        await query.answer()
+        await query.edit_message_text("✏️ أرسل الحد الأدنى للسحب الجديد (رقم فقط):")
         return
     
     min_w = int(query.data.split("_")[-1])
