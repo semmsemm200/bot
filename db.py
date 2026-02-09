@@ -26,6 +26,57 @@ else:
     DB_TYPE = 'sqlite'
 
 
+def execute_query(query, params=None):
+    """Execute query with proper placeholder conversion for PostgreSQL/SQLite"""
+    if DB_TYPE == 'postgresql' and params:
+        # Convert ? to %s for PostgreSQL
+        query = query.replace('?', '%s')
+    cursor.execute(query, params or ())
+
+
+def execute_insert_or_replace(table, key_col, key_val, data_dict):
+    """Insert or replace/update a row"""
+    cols = ', '.join(data_dict.keys())
+    placeholders = ', '.join(['?' for _ in data_dict])
+    values = tuple(data_dict.values())
+    
+    if DB_TYPE == 'postgresql':
+        # PostgreSQL: ON CONFLICT DO UPDATE
+        updates = ', '.join([f"{k} = EXCLUDED.{k}" for k in data_dict.keys() if k != key_col])
+        query = f"""
+            INSERT INTO {table} ({cols}) VALUES ({placeholders})
+            ON CONFLICT ({key_col}) DO UPDATE SET {updates}
+        """
+        query = query.replace('?', '%s')
+    else:
+        # SQLite: INSERT OR REPLACE
+        query = f"INSERT OR REPLACE INTO {table} ({cols}) VALUES ({placeholders})"
+    
+    cursor.execute(query, values)
+    conn.commit()
+
+
+def execute_insert_or_ignore(table, data_dict):
+    """Insert or ignore if exists"""
+    cols = ', '.join(data_dict.keys())
+    placeholders = ', '.join(['?' for _ in data_dict])
+    values = tuple(data_dict.values())
+    
+    if DB_TYPE == 'postgresql':
+        # Get primary key column (assume first column)
+        first_col = list(data_dict.keys())[0]
+        query = f"""
+            INSERT INTO {table} ({cols}) VALUES ({placeholders})
+            ON CONFLICT ({first_col}) DO NOTHING
+        """
+        query = query.replace('?', '%s')
+    else:
+        query = f"INSERT OR IGNORE INTO {table} ({cols}) VALUES ({placeholders})"
+    
+    cursor.execute(query, values)
+    conn.commit()
+
+
 def init_db():
     if DB_TYPE == 'postgresql':
         # PostgreSQL syntax
@@ -220,14 +271,13 @@ def init_db():
 
 # ---- Settings ----
 def get_setting(key):
-    cursor.execute("SELECT value FROM settings WHERE key=?", (key,))
+    execute_query("SELECT value FROM settings WHERE key=?", (key,))
     row = cursor.fetchone()
     return row["value"] if row else None
 
 
 def set_setting(key, value):
-    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
-    conn.commit()
+    execute_insert_or_replace('settings', 'key', key, {'key': key, 'value': str(value)})
 
 
 # ---- Users ----
@@ -534,23 +584,21 @@ def get_withdrawal_methods():
 
 
 def get_withdrawal_method(name):
-    cursor.execute("SELECT * FROM withdrawal_methods WHERE name=?", (name,))
+    execute_query("SELECT * FROM withdrawal_methods WHERE name=?", (name,))
     return cursor.fetchone()
 
 
 def add_withdrawal_method(name, min_amount=0, fee=0):
-    cursor.execute("INSERT OR IGNORE INTO withdrawal_methods (name, min_amount, fee) VALUES (?, ?, ?)",
-                   (name, min_amount, fee))
-    conn.commit()
+    execute_insert_or_ignore('withdrawal_methods', {'name': name, 'min_amount': min_amount, 'fee': fee})
 
 
 def update_withdrawal_method_min(name, min_amount):
-    cursor.execute("UPDATE withdrawal_methods SET min_amount=? WHERE name=?", (min_amount, name))
+    execute_query("UPDATE withdrawal_methods SET min_amount=? WHERE name=?", (min_amount, name))
     conn.commit()
 
 
 def update_withdrawal_method_fee(name, fee):
-    cursor.execute("UPDATE withdrawal_methods SET fee=? WHERE name=?", (fee, name))
+    execute_query("UPDATE withdrawal_methods SET fee=? WHERE name=?", (fee, name))
     conn.commit()
 
 
