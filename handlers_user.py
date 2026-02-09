@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 import db
 from config import ADMIN_ID, CHANNEL_LINK
 from helpers import (
-    check_channel_member, is_admin, bot_is_active,
+    check_channel_member, require_subscription, is_admin, bot_is_active,
     get_main_menu_keyboard, send_to_admins, send_photo_to_admins
 )
 
@@ -29,7 +29,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except (ValueError, IndexError):
             referrer_id = 0
 
-    # Register user (removed channel check)
+    # Store referrer_id in context for later use
+    context.user_data['referrer_id'] = referrer_id
+    context.user_data['first_name'] = first_name
+    context.user_data['last_name'] = last_name
+
+    # Check channel membership
+    is_member = await check_channel_member(context.bot, user_id)
+    
+    if not is_member:
+        keyboard = [[InlineKeyboardButton("📢 اشترك في القناة", url=CHANNEL_LINK)],
+                    [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data="verify_subscription")]]
+        await update.message.reply_text(
+            "🔔 مرحباً بك!\n\n"
+            "للاستمرار في استخدام البوت، يجب عليك الاشتراك في قناة التحديثات والأخبار أولاً.\n\n"
+            "📢 اضغط على الزر بالأسفل للاشتراك، ثم اضغط 'تحققت من الاشتراك'",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    # Register user
     db.add_user(user_id, username, referrer_id, first_name, last_name)
     if referrer_id and referrer_id != user_id:
         referrer = db.get_user(referrer_id)
@@ -38,6 +57,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = "مرحباً، كل شيء هنا بسيط وسهل، ستقوم بعمل مهمات مقابل مكافأة."
     await update.message.reply_text(msg, reply_markup=get_main_menu_keyboard(user_id))
+
+
+async def verify_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    username = query.from_user.username
+    
+    # Check if user is actually subscribed
+    is_member = await check_channel_member(context.bot, user_id)
+    
+    if not is_member:
+        await query.answer("⚠️ لم تشترك في القناة بعد! اشترك أولاً ثم حاول مرة أخرى.", show_alert=True)
+        return
+    
+    # Get stored data
+    referrer_id = context.user_data.get('referrer_id', 0)
+    first_name = context.user_data.get('first_name', query.from_user.first_name)
+    last_name = context.user_data.get('last_name', query.from_user.last_name)
+    
+    # Register user
+    db.add_user(user_id, username, referrer_id, first_name, last_name)
+    if referrer_id and referrer_id != user_id:
+        referrer = db.get_user(referrer_id)
+        if referrer:
+            db.add_referral(referrer_id, user_id)
+    
+    await query.answer("✅ تم التحقق بنجاح!", show_alert=True)
+    msg = "مرحباً، كل شيء هنا بسيط وسهل، ستقوم بعمل مهمات مقابل مكافأة."
+    await query.message.reply_text(msg, reply_markup=get_main_menu_keyboard(user_id))
+    
+    # Delete the subscription message
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
 
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,6 +138,10 @@ async def new_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
 
     # Check if user is banned
     if db.is_user_banned(user_id):
@@ -190,6 +248,25 @@ async def admin_approve_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if user and user["referrer_id"]:
         reward = int(db.get_setting("referral_reward") or 2)
         db.add_to_referral_balance(user["referrer_id"], reward)
+        
+        # Notify referrer about the completed task
+        try:
+            # Get referred user info
+            user_dict = dict(user)
+            referred_username = user_dict.get('username', None)
+            referred_display = f"@{referred_username}" if referred_username else f"ID: {task['user_id']}"
+            
+            await context.bot.send_message(
+                user["referrer_id"],
+                f"🎉 مبروك! المُحال الخاص بك أكمل مهمة\n\n"
+                f"👤 المُحال: {referred_display}\n"
+                f"🆔 ID: {task['user_id']}\n"
+                f"✅ المهمة: #{task_id}\n"
+                f"💰 مكافأتك: {reward} جنيه\n\n"
+                f"تم إضافة المكافأة لرصيد الإحالات الخاص بك! 🎁"
+            )
+        except Exception:
+            pass
 
     # Send notification to user
     try:
@@ -542,6 +619,10 @@ async def tutorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== TEXT HANDLERS FOR KEYBOARD BUTTONS ====================
 async def new_task_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     user_id = update.effective_user.id
     if db.is_user_banned(user_id):
         await update.message.reply_text("⛔ تم حظرك من استخدام البوت.")
@@ -568,6 +649,10 @@ async def new_task_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def balance_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     user_id = update.effective_user.id
     user = db.get_user(user_id)
     if not user:
@@ -576,8 +661,8 @@ async def balance_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         f"🆔 ID: {user['id']}\n"
         f"💰 رصيد متاح: {user['available']} جنيه\n"
-        f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
-        f"👥 رصيد الإحالات: {user['referral_balance']} جنيه\n\n"
+        f"� رصيد محجوز: {user['reserved']} جنيه\n"
+        f"� رصيد الإحالات: {user['referral_balance']} جنيه\n\n"
         f"⏳ الرصيد المحجوز يتحول لرصيد متاح بعد 48 ساعة."
     )
     keyboard = [[InlineKeyboardButton("📜 سجل السحوبات", callback_data="withdrawal_history")]]
@@ -585,11 +670,15 @@ async def balance_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def my_tasks_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     user_id = update.effective_user.id
     stats = db.get_user_task_stats(user_id)
     tasks_list = db.get_user_tasks(user_id)
     msg = (
-        f"📊 إحصائيات مهامك:\n"
+        f"� إحصائيات مهامك:\n"
         f"📋 إجمالي المهام: {stats['total']}\n"
         f"✅ مهام مقبولة: {stats['approved']}\n"
         f"❌ مهام مرفوضة: {stats['rejected']}\n\n"
@@ -614,6 +703,10 @@ async def my_tasks_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def withdraw_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     user_id = update.effective_user.id
     
     # Check if user is banned
@@ -640,12 +733,16 @@ async def withdraw_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             callback_data=f"wmethod_{m['name']}"
         )])
     await update.message.reply_text(
-        f"💸 رصيدك المتاح: {total_available} جنيه\nاختر طريقة السحب:",
+        f"� رصيدك المتاح: {total_available} جنيه\nاختر طريقة السحب:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
 async def referrals_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     user_id = update.effective_user.id
     user = db.get_user(user_id)
     ref_count = db.get_referral_count(user_id)
@@ -668,6 +765,10 @@ async def referrals_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def withdraw_referral_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     user_id = update.effective_user.id
     
     # Check if user is banned
@@ -689,6 +790,10 @@ async def withdraw_referral_text(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def tutorial_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check subscription
+    if not await require_subscription(update, context):
+        return
+    
     video_id = db.get_setting("tutorial_video_id")
     if video_id:
         await context.bot.send_video(update.effective_user.id, video_id, caption="🎬 فيديو شرح طريقة عمل المهمة")

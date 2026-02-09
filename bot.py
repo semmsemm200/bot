@@ -2,7 +2,7 @@ import db
 from config import TOKEN, ADMIN_ID
 from helpers import is_admin, get_main_menu_keyboard, send_to_admins, send_photo_to_admins
 from handlers_user import (
-    start, check_subscription, menu_command, back_to_menu,
+    start, check_subscription, verify_subscription, menu_command, back_to_menu,
     new_task, admin_send_task_data, task_done, task_cancel, task_how_to,
     admin_approve_task, admin_reject_task, admin_error_task,
     balance, my_tasks, withdraw, withdraw_method_selected,
@@ -291,7 +291,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
 
-    if data == "check_sub":
+    if data == "verify_subscription":
+        await verify_subscription(update, context)
+    elif data == "check_sub":
         await check_subscription(update, context)
     elif data == "back_menu":
         await back_to_menu(update, context)
