@@ -38,7 +38,13 @@ async def require_subscription(update: Update, context: ContextTypes.DEFAULT_TYP
         return False
     
     # User exists, verify they're still subscribed
-    is_member = await check_channel_member(context.bot, user_id)
+    try:
+        is_member = await check_channel_member(context.bot, user_id)
+    except Exception as e:
+        # If channel check fails, allow user to continue
+        print(f"Channel check failed in require_subscription: {e}")
+        return True
+    
     if not is_member:
         keyboard = [[InlineKeyboardButton("📢 اشترك في القناة", url=CHANNEL_LINK)],
                     [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data="verify_subscription")]]
