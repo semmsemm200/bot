@@ -166,24 +166,28 @@ async def admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
 
-    total = db.get_user_count()
-    active = db.get_active_user_count()
-    balances = db.get_total_balances()
+    try:
+        total = db.get_user_count()
+        active = db.get_active_user_count()
+        balances = db.get_total_balances()
 
-    keyboard = [
-        [InlineKeyboardButton("📋 بيانات المستخدمين", callback_data="admin_users_list")],
-        [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")],
-    ]
+        keyboard = [
+            [InlineKeyboardButton("📋 بيانات المستخدمين", callback_data="admin_users_list")],
+            [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")],
+        ]
 
-    msg = (
-        f"👥 إدارة المستخدمين\n\n"
-        f"📊 إجمالي المستخدمين: {total}\n"
-        f"🟢 المستخدمين النشطين: {active}\n"
-        f"💰 إجمالي الرصيد المتاح: {balances['avail']} جنيه\n"
-        f"🔒 إجمالي الرصيد المحجوز: {balances['res']} جنيه\n"
-        f"👥 إجمالي رصيد الإحالات: {balances['ref']} جنيه"
-    )
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        msg = (
+            f"👥 إدارة المستخدمين\n\n"
+            f"📊 إجمالي المستخدمين: {total}\n"
+            f"🟢 المستخدمين النشطين: {active}\n"
+            f"💰 إجمالي الرصيد المتاح: {balances['avail']} جنيه\n"
+            f"🔒 إجمالي الرصيد المحجوز: {balances['res']} جنيه\n"
+            f"👥 إجمالي رصيد الإحالات: {balances['ref']} جنيه"
+        )
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    except Exception as e:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text(f"⚠️ خطأ في قراءة البيانات: {str(e)}", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -194,12 +198,19 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         users = db.get_all_users()
-        if not users:
+        
+        # Debug: check if users is None or empty
+        if users is None:
             keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
-            await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text("⚠️ خطأ: لم يتم إرجاع بيانات من قاعدة البيانات.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+            
+        if not users or len(users) == 0:
+            keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
+            await query.edit_message_text("لا يوجد مستخدمين مسجلين في البوت.", reply_markup=InlineKeyboardMarkup(keyboard))
             return
         
-        msg = "📋 بيانات المستخدمين:\n\n"
+        msg = f"📋 بيانات المستخدمين ({len(users)} مستخدم):\n\n"
         for u in users[:30]:
             try:
                 user_id = u.get('id', 0)
@@ -217,7 +228,8 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🆔 ID: {user_id} | 📱 {username_display}\n"
                     f"💰 متاح: {available} | 🔒 محجوز: {reserved} | 👥 إحالات: {referral_balance} | عدد: {ref_count}\n\n"
                 )
-            except Exception:
+            except Exception as e:
+                msg += f"⚠️ خطأ في قراءة مستخدم: {str(e)}\n\n"
                 continue
 
         if len(msg) > 4000:
