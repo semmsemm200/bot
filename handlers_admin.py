@@ -585,10 +585,10 @@ async def admin_do_clear_balance(update: Update, context: ContextTypes.DEFAULT_T
     user = db.get_user(user_id)
     if user:
         db.clear_user_balance(user_id)
-        await query.answer(f"✅ تم مسح رصيد المستخدم {user_id} بنجاح", show_alert=True)
-        await query.edit_message_text(f"✅ تم مسح رصيد المستخدم {user['username'] or user_id} بالكامل.")
+        await query.answer(f"✅ تم مسح الرصيد\n👤 المستخدم: {user_id}", show_alert=True)
+        await query.edit_message_text(f"✅ تم مسح رصيد المستخدم بالكامل\n👤 {user['username'] or user_id} (ID: {user_id})")
     else:
-        await query.answer("المستخدم غير موجود", show_alert=True)
+        await query.answer("❌ المستخدم غير موجود", show_alert=True)
 
 
 # ==================== ADMIN CANCEL TASK ====================
@@ -686,10 +686,10 @@ async def admin_do_cancel_task(update: Update, context: ContextTypes.DEFAULT_TYP
         db.cancel_task(task_id)
         try:
             await context.bot.send_message(task["user_id"], f"❌ تم إلغاء المهمة #{task_id} بواسطة المشرف.")
-            await query.answer("✅ تم إلغاء المهمة وتم إرسال الإشعار للمستخدم", show_alert=True)
+            await query.answer(f"✅ تم إلغاء المهمة\n🆔 المهمة: #{task_id}\n👤 المستخدم: {task['user_id']}", show_alert=True)
         except Exception as e:
-            await query.answer(f"✅ تم إلغاء المهمة لكن تعذر إرسال الإشعار: {str(e)}", show_alert=True)
-        await query.edit_message_text(f"✅ تم إلغاء المهمة #{task_id}.")
+            await query.answer(f"✅ تم إلغاء المهمة #{task_id}\n⚠️ لكن تعذر إرسال الإشعار", show_alert=True)
+        await query.edit_message_text(f"✅ تم إلغاء المهمة #{task_id} للمستخدم {task['user_id']}")
     else:
         await query.answer("⚠️ المهمة غير موجودة", show_alert=True)
         await query.edit_message_text("⚠️ المهمة غير موجودة.")
@@ -753,8 +753,8 @@ async def admin_reward_select_user(update: Update, context: ContextTypes.DEFAULT
 
 async def admin_reward_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
     
     parts = query.data.split("_")
@@ -766,13 +766,15 @@ async def admin_reward_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     try:
         await context.bot.send_message(user_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
-        await query.answer(f"✅ تم إضافة {amount} جنيه وتم إرسال الإشعار", show_alert=True)
+        await query.answer(f"✅ تم إضافة المكافأة\n💰 {amount} جنيه للمستخدم {user_id}", show_alert=True)
     except Exception as e:
-        await query.answer(f"✅ تم إضافة {amount} جنيه لكن تعذر إرسال الإشعار", show_alert=True)
+        await query.answer(f"✅ تم إضافة المكافأة\n💰 {amount} جنيه للمستخدم {user_id}\n⚠️ لكن تعذر إرسال الإشعار", show_alert=True)
     
     await query.edit_message_text(
-        f"✅ تم إضافة {amount} جنيه للمستخدم {user['username'] or user_id}\n"
-        f"💰 الرصيد الجديد: {user['available']} جنيه"
+        f"✅ تم إضافة المكافأة بنجاح\n"
+        f"👤 المستخدم: {user['username'] or user_id} (ID: {user_id})\n"
+        f"💰 المبلغ المضاف: {amount} جنيه\n"
+        f"💵 الرصيد الجديد: {user['available']} جنيه"
     )
 
 
@@ -820,18 +822,18 @@ async def admin_do_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.unban_user(user_id)
         try:
             await context.bot.send_message(user_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
-            await query.answer("✅ تم رفع الحظر وتم إرسال الإشعار", show_alert=True)
+            await query.answer(f"✅ تم رفع الحظر\n👤 المستخدم: {user_id}", show_alert=True)
         except Exception:
-            await query.answer("✅ تم رفع الحظر لكن تعذر إرسال الإشعار", show_alert=True)
-        await query.edit_message_text(f"✅ تم رفع الحظر عن المستخدم {user['username'] or user_id}")
+            await query.answer(f"✅ تم رفع الحظر\n👤 المستخدم: {user_id}\n⚠️ لكن تعذر إرسال الإشعار", show_alert=True)
+        await query.edit_message_text(f"✅ تم رفع الحظر عن المستخدم\n👤 {user['username'] or user_id} (ID: {user_id})")
     else:
         db.ban_user(user_id)
         try:
             await context.bot.send_message(user_id, "⛔ تم حظرك من استخدام البوت.")
-            await query.answer("🚫 تم حظر المستخدم وتم إرسال الإشعار", show_alert=True)
+            await query.answer(f"🚫 تم حظر المستخدم\n👤 المستخدم: {user_id}", show_alert=True)
         except Exception:
-            await query.answer("🚫 تم حظر المستخدم لكن تعذر إرسال الإشعار", show_alert=True)
-        await query.edit_message_text(f"🚫 تم حظر المستخدم {user['username'] or user_id}")
+            await query.answer(f"🚫 تم حظر المستخدم\n👤 المستخدم: {user_id}\n⚠️ لكن تعذر إرسال الإشعار", show_alert=True)
+        await query.edit_message_text(f"🚫 تم حظر المستخدم\n👤 {user['username'] or user_id} (ID: {user_id})")
 
 
 # ==================== ADMIN TOGGLE BOT WITH NOTIFICATION ====================
