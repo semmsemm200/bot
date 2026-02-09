@@ -179,21 +179,29 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     users = db.get_all_users()
+    if not users:
+        keyboard = [[InlineKeyboardButton("🔙 إدارة المستخدمين", callback_data="admin_users")]]
+        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
     msg = "📋 بيانات المستخدمين:\n\n"
     for u in users[:30]:
         ref_count = db.get_referral_count(u["id"])
         
         # Build display name
         display_name = ""
-        if u.get('first_name'):
-            display_name = u['first_name']
-            if u.get('last_name'):
-                display_name += f" {u['last_name']}"
+        first_name = u.get('first_name') or u.get('username') or str(u['id'])
+        last_name = u.get('last_name') or ""
+        
+        if first_name:
+            display_name = first_name
+            if last_name:
+                display_name += f" {last_name}"
         
         username_display = f"@{u['username']}" if u.get('username') else "لا يوجد"
         
         msg += (
-            f"👤 {display_name or 'غير معروف'}\n"
+            f"👤 {display_name}\n"
             f"🆔 ID: {u['id']} | 📱 {username_display}\n"
             f"💰 متاح: {u['available']} | 🔒 محجوز: {u['reserved']} | 👥 إحالات: {u['referral_balance']} | عدد: {ref_count}\n\n"
         )
