@@ -53,7 +53,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
             db.add_referral(referrer_id, user_id)
 
     msg = "مرحباً، كل شيء هنا بسيط وسهل، ستقوم بعمل مهمات مقابل مكافأة."
-    await query.edit_message_text(msg, reply_markup=get_main_menu_keyboard(user_id))
+    await context.bot.send_message(user_id, msg, reply_markup=get_main_menu_keyboard(user_id))
 
 
 # ==================== MENU ====================
@@ -72,7 +72,7 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    await query.edit_message_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
+    await context.bot.send_message(user_id, "اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
 
 
 # ==================== NEW TASK ====================
