@@ -1,96 +1,194 @@
 import sqlite3
 import datetime
 import json
+import os
 
-conn = sqlite3.connect("bot.db", check_same_thread=False)
-conn.row_factory = sqlite3.Row
-cursor = conn.cursor()
+# Check if DATABASE_URL is set (for PostgreSQL on Heroku/Render)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Use PostgreSQL
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    
+    # Fix for Heroku DATABASE_URL (postgres:// -> postgresql://)
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    DB_TYPE = 'postgresql'
+else:
+    # Use SQLite (for local development)
+    conn = sqlite3.connect("bot.db", check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    DB_TYPE = 'sqlite'
 
 
 def init_db():
-    cursor.executescript('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            username TEXT,
-            first_name TEXT,
-            last_name TEXT,
-            available INTEGER DEFAULT 0,
-            reserved INTEGER DEFAULT 0,
-            referral_balance INTEGER DEFAULT 0,
-            referrer_id INTEGER DEFAULT 0,
-            is_banned INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            description TEXT,
-            price INTEGER,
-            status TEXT DEFAULT 'pending',
-            proof_file_id TEXT,
-            admin_data TEXT,
-            error_note TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP,
-            reserved_until TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS withdrawals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            method TEXT,
-            data TEXT,
-            amount INTEGER,
-            status TEXT DEFAULT 'pending',
-            receipt_file_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS referrals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            referrer_id INTEGER,
-            referred_id INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS admins (
-            id INTEGER PRIMARY KEY
-        );
-
-        CREATE TABLE IF NOT EXISTS withdrawal_methods (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE,
-            min_amount INTEGER DEFAULT 0,
-            fee INTEGER DEFAULT 0
-        );
-    ''')
-    
-    # Add is_banned column if it doesn't exist (for existing databases)
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0")
+    if DB_TYPE == 'postgresql':
+        # PostgreSQL syntax
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id BIGINT PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                available INTEGER DEFAULT 0,
+                reserved INTEGER DEFAULT 0,
+                referral_balance INTEGER DEFAULT 0,
+                referrer_id BIGINT DEFAULT 0,
+                is_banned INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT,
+                description TEXT,
+                price INTEGER,
+                status TEXT DEFAULT 'pending',
+                proof_file_id TEXT,
+                admin_data TEXT,
+                error_note TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                reserved_until TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS withdrawals (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT,
+                method TEXT,
+                data TEXT,
+                amount INTEGER,
+                status TEXT DEFAULT 'pending',
+                receipt_file_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS referrals (
+                id SERIAL PRIMARY KEY,
+                referrer_id BIGINT,
+                referred_id BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admins (
+                id BIGINT PRIMARY KEY
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS withdrawal_methods (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE,
+                min_amount INTEGER DEFAULT 0,
+                fee INTEGER DEFAULT 0
+            )
+        ''')
+        
         conn.commit()
-    except Exception:
-        # Column already exists
-        pass
+    else:
+        # SQLite syntax
+        cursor.executescript('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                available INTEGER DEFAULT 0,
+                reserved INTEGER DEFAULT 0,
+                referral_balance INTEGER DEFAULT 0,
+                referrer_id INTEGER DEFAULT 0,
+                is_banned INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                description TEXT,
+                price INTEGER,
+                status TEXT DEFAULT 'pending',
+                proof_file_id TEXT,
+                admin_data TEXT,
+                error_note TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                reserved_until TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS withdrawals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                method TEXT,
+                data TEXT,
+                amount INTEGER,
+                status TEXT DEFAULT 'pending',
+                receipt_file_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS referrals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                referrer_id INTEGER,
+                referred_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS admins (
+                id INTEGER PRIMARY KEY
+            );
+
+            CREATE TABLE IF NOT EXISTS withdrawal_methods (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE,
+                min_amount INTEGER DEFAULT 0,
+                fee INTEGER DEFAULT 0
+            );
+        ''')
     
-    # Add first_name and last_name columns if they don't exist
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN first_name TEXT")
-        conn.commit()
-    except Exception:
-        pass
-    
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN last_name TEXT")
-        conn.commit()
-    except Exception:
-        pass
+    # Add columns if they don't exist (for existing databases)
+    if DB_TYPE == 'sqlite':
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0")
+            conn.commit()
+        except Exception:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN first_name TEXT")
+            conn.commit()
+        except Exception:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_name TEXT")
+            conn.commit()
+        except Exception:
+            pass
     
     conn.commit()
 
