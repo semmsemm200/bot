@@ -304,7 +304,11 @@ async def admin_reserved_user_tasks(update: Update, context: ContextTypes.DEFAUL
     tasks = db.get_reserved_tasks_by_user(user_id)
     
     if not tasks:
-        await query.answer("⚠️ لا توجد مهام محجوزة لهذا المستخدم", show_alert=True)
+        keyboard = [[InlineKeyboardButton("🔙 قائمة المستخدمين", callback_data="admin_reserved")]]
+        await query.edit_message_text(
+            "⚠️ لا توجد مهام محجوزة لهذا المستخدم",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return
     
     from datetime import datetime
@@ -318,41 +322,57 @@ async def admin_reserved_user_tasks(update: Update, context: ContextTypes.DEFAUL
     
     keyboard = []
     for t in tasks:
-        # Calculate time passed since approval
-        completed_at = datetime.fromisoformat(t['completed_at']) if t.get('completed_at') else None
-        reserved_until = datetime.fromisoformat(t['reserved_until'])
-        now = datetime.now()
-        
-        if completed_at:
-            time_passed = now - completed_at
-            hours_passed = int(time_passed.total_seconds() // 3600)
-            minutes_passed = int((time_passed.total_seconds() % 3600) // 60)
-            time_info = f"⏱️ مر {hours_passed} ساعة و {minutes_passed} دقيقة"
-        else:
-            time_info = "⏱️ غير محدد"
-        
-        # Time remaining
-        time_diff = reserved_until - now
-        if time_diff.total_seconds() > 0:
-            hours_remaining = int(time_diff.total_seconds() // 3600)
-            minutes_remaining = int((time_diff.total_seconds() % 3600) // 60)
-            time_remaining = f"⏰ باقي {hours_remaining}س {minutes_remaining}د"
-            status_emoji = "🟡"
-        else:
-            time_remaining = "✅ جاهز للتحرير"
-            status_emoji = "🟢"
-        
-        msg += (
-            f"{status_emoji} المهمة #{t['id']}\n"
-            f"💰 المبلغ: {t['price']} جنيه\n"
-            f"{time_info}\n"
-            f"{time_remaining}\n\n"
-        )
-        
-        keyboard.append([
-            InlineKeyboardButton(f"📋 تفاصيل المهمة #{t['id']}", callback_data=f"admin_task_details_{t['id']}"),
-            InlineKeyboardButton(f"✅ تحرير #{t['id']}", callback_data=f"admin_release_{t['id']}")
-        ])
+        try:
+            # Calculate time passed since approval
+            if t.get('completed_at'):
+                try:
+                    completed_at = datetime.fromisoformat(str(t['completed_at']))
+                    now = datetime.now()
+                    time_passed = now - completed_at
+                    hours_passed = int(time_passed.total_seconds() // 3600)
+                    minutes_passed = int((time_passed.total_seconds() % 3600) // 60)
+                    time_info = f"⏱️ مر {hours_passed} ساعة و {minutes_passed} دقيقة"
+                except:
+                    time_info = "⏱️ غير محدد"
+            else:
+                time_info = "⏱️ غير محدد"
+            
+            # Time remaining
+            if t.get('reserved_until'):
+                try:
+                    reserved_until = datetime.fromisoformat(str(t['reserved_until']))
+                    now = datetime.now()
+                    time_diff = reserved_until - now
+                    
+                    if time_diff.total_seconds() > 0:
+                        hours_remaining = int(time_diff.total_seconds() // 3600)
+                        minutes_remaining = int((time_diff.total_seconds() % 3600) // 60)
+                        time_remaining = f"⏰ باقي {hours_remaining}س {minutes_remaining}د"
+                        status_emoji = "🟡"
+                    else:
+                        time_remaining = "✅ جاهز للتحرير"
+                        status_emoji = "🟢"
+                except:
+                    time_remaining = "✅ جاهز للتحرير"
+                    status_emoji = "🟢"
+            else:
+                time_remaining = "✅ جاهز للتحرير"
+                status_emoji = "🟢"
+            
+            msg += (
+                f"{status_emoji} المهمة #{t['id']}\n"
+                f"💰 المبلغ: {t['price']} جنيه\n"
+                f"{time_info}\n"
+                f"{time_remaining}\n\n"
+            )
+            
+            keyboard.append([
+                InlineKeyboardButton(f"📋 تفاصيل #{t['id']}", callback_data=f"admin_task_details_{t['id']}"),
+                InlineKeyboardButton(f"✅ تحرير #{t['id']}", callback_data=f"admin_release_{t['id']}")
+            ])
+        except Exception as e:
+            print(f"Error processing task {t.get('id')}: {e}")
+            continue
     
     # Add option to release all tasks for this user
     total_amount = sum(t['price'] for t in tasks)
@@ -425,19 +445,28 @@ async def admin_release_task(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer("⚠️ المهمة غير موجودة أو تم تحويلها بالفعل", show_alert=True)
         return
 
-    db.release_task(task_id)
-    db.move_reserved_to_available(task["user_id"], task["price"])
-
-    await query.answer(f"✅ تم تحرير الرصيد\n💰 {task['price']} جنيه\n👤 المستخدم: {task['user_id']}", show_alert=True)
+    user_id = task["user_id"]
     
-    # Notify user
     try:
-        await context.bot.send_message(
-            task["user_id"],
-            f"✅ تم تحويل {task['price']} جنيه من الرصيد المحجوز إلى الرصيد المتاح!"
-        )
-    except Exception:
-        pass
+        db.release_task(task_id)
+        db.move_reserved_to_available(user_id, task["price"])
+        
+        await query.answer(f"✅ تم تحرير الرصيد\n💰 {task['price']} جنيه", show_alert=True)
+        
+        # Notify user
+        try:
+            await context.bot.send_message(
+                user_id,
+                f"✅ تم تحويل {task['price']} جنيه من الرصيد المحجوز إلى الرصيد المتاح!"
+            )
+        except Exception:
+            pass
+        
+        # Go back to user's tasks list
+        query.data = f"admin_reserved_user_{user_id}"
+        await admin_reserved_user_tasks(update, context)
+    except Exception as e:
+        await query.answer(f"❌ خطأ: {str(e)}", show_alert=True)
     
     # Go back to user's tasks list
     # Simulate callback data to show user tasks again
