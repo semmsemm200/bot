@@ -45,7 +45,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = context.user_data.pop("admin_sending_data_for_task")
         task = db.get_task(task_id)
         if not task:
-            await update.message.reply_text("المهمة غير موجودة.")
+            await update.message.reply_text("❌ المهمة غير موجودة.")
             return
         db.update_task_admin_data(task_id, text)
         keyboard = [
@@ -53,12 +53,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("إلغاء المهمة", callback_data=f"task_cancel_{task_id}")],
             [InlineKeyboardButton("كيفية عمل المهمة", callback_data=f"task_howto_{task_id}")],
         ]
-        await context.bot.send_message(
-            task["user_id"],
-            f"بيانات المهمة #{task_id}:\n\n{text}\n\nسعر المهمة: {task['price']} جنيه",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        await update.message.reply_text(f"تم إرسال بيانات المهمة #{task_id} للمستخدم.")
+        try:
+            await context.bot.send_message(
+                task["user_id"],
+                f"بيانات المهمة #{task_id}:\n\n{text}\n\nسعر المهمة: {task['price']} جنيه",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            await update.message.reply_text(f"✅ تم إرسال بيانات المهمة #{task_id} للمستخدم بنجاح.")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ تعذر إرسال البيانات للمستخدم: {str(e)}")
         return
 
     # Admin: error description for task
@@ -94,27 +97,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fee = method["fee"] if method else 0
         final_amount = amount - fee
         if final_amount <= 0:
-            await update.message.reply_text("رصيدك لا يكفي بعد خصم الرسوم.")
+            await update.message.reply_text("⚠️ رصيدك لا يكفي بعد خصم الرسوم.")
             return
         db.update_user_balance(user_id, available=0)
         wid = db.create_withdrawal(user_id, method_name, text, amount)
         await update.message.reply_text(
-            f"تم إرسال طلب السحب #{wid}\n"
-            f"الطريقة: {method_name}\n"
-            f"المبلغ: {amount} جنيه\n"
-            f"الرسوم: {fee} جنيه\n"
-            f"في انتظار موافقة المشرف."
+            f"✅ تم إرسال طلب السحب #{wid} بنجاح\n"
+            f"📱 الطريقة: {method_name}\n"
+            f"💰 المبلغ: {amount} جنيه\n"
+            f"💸 الرسوم: {fee} جنيه\n"
+            f"⏳ في انتظار موافقة المشرف."
         )
         kb = [
-            [InlineKeyboardButton("قبول", callback_data=f"admin_approve_w_{wid}"),
-             InlineKeyboardButton("رفض", callback_data=f"admin_reject_w_{wid}")]
+            [InlineKeyboardButton("✅ قبول", callback_data=f"admin_approve_w_{wid}"),
+             InlineKeyboardButton("❌ رفض", callback_data=f"admin_reject_w_{wid}")]
         ]
         await send_to_admins(context,
-            f"طلب سحب جديد #{wid}\n"
-            f"مستخدم: {user_id}\n"
-            f"الطريقة: {method_name}\n"
-            f"البيانات: {text}\n"
-            f"المبلغ: {amount} جنيه",
+            f"💸 طلب سحب جديد #{wid}\n"
+            f"👤 مستخدم: {user_id}\n"
+            f"📱 الطريقة: {method_name}\n"
+            f"📝 البيانات: {text}\n"
+            f"💰 المبلغ: {amount} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -154,17 +157,17 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = context.user_data.pop("submitting_proof_for_task")
         task = db.get_task(task_id)
         if not task:
-            await update.message.reply_text("المهمة غير موجودة.")
+            await update.message.reply_text("❌ المهمة غير موجودة.")
             return
         db.update_task_proof(task_id, file_id)
-        await update.message.reply_text(f"تم إرسال الإثبات للمهمة #{task_id}. في انتظار مراجعة المشرف.")
+        await update.message.reply_text(f"✅ تم إرسال الإثبات للمهمة #{task_id} بنجاح. في انتظار مراجعة المشرف.")
         kb = [
             [InlineKeyboardButton("موافقة", callback_data=f"admin_approve_t_{task_id}")],
             [InlineKeyboardButton("رفض", callback_data=f"admin_reject_t_{task_id}")],
             [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
         ]
         await send_photo_to_admins(context, file_id,
-            f"إثبات المهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} جنيه",
+            f"📸 إثبات المهمة #{task_id}\n👤 مستخدم: {task['user_id']}\n💰 السعر: {task['price']} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -176,17 +179,17 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = resubmit_tasks.pop(user_key)
         task = db.get_task(task_id)
         if not task:
-            await update.message.reply_text("المهمة غير موجودة.")
+            await update.message.reply_text("❌ المهمة غير موجودة.")
             return
         db.update_task_error_resubmit(task_id, file_id)
-        await update.message.reply_text(f"تم إرسال الإثبات الجديد للمهمة #{task_id}. في انتظار مراجعة المشرف.")
+        await update.message.reply_text(f"✅ تم إرسال الإثبات الجديد للمهمة #{task_id} بنجاح. في انتظار مراجعة المشرف.")
         kb = [
             [InlineKeyboardButton("موافقة", callback_data=f"admin_approve_t_{task_id}")],
             [InlineKeyboardButton("رفض", callback_data=f"admin_reject_t_{task_id}")],
             [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
         ]
         await send_photo_to_admins(context, file_id,
-            f"إثبات معاد للمهمة #{task_id}\nمستخدم: {task['user_id']}\nالسعر: {task['price']} جنيه",
+            f"📸 إثبات معاد للمهمة #{task_id}\n👤 مستخدم: {task['user_id']}\n💰 السعر: {task['price']} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -196,16 +199,16 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wid = context.user_data.pop("admin_approve_withdrawal_id")
         w = db.get_withdrawal(wid)
         if not w:
-            await update.message.reply_text("طلب السحب غير موجود.")
+            await update.message.reply_text("❌ طلب السحب غير موجود.")
             return
         db.approve_withdrawal(wid)
         db.set_withdrawal_receipt(wid, file_id)
         try:
             await context.bot.send_photo(
                 w["user_id"], file_id,
-                caption=f"✅ تم تنفيذ طلب السحب #{wid}\nالمبلغ: {w['amount']} جنيه\nالطريقة: {w['method']}"
+                caption=f"✅ تم تنفيذ طلب السحب #{wid}\n💰 المبلغ: {w['amount']} جنيه\n📱 الطريقة: {w['method']}"
             )
-            await update.message.reply_text(f"✅ تم قبول طلب السحب #{wid} وتم إرسال الإيصال للمستخدم.")
+            await update.message.reply_text(f"✅ تم قبول طلب السحب #{wid} وتم إرسال الإيصال للمستخدم بنجاح.")
         except Exception as e:
             await update.message.reply_text(f"✅ تم قبول الطلب لكن تعذر إرسال الإيصال: {str(e)}")
         return
@@ -221,9 +224,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         video = update.message.video
         if video:
             db.set_setting("tutorial_video_id", video.file_id)
-            await update.message.reply_text("تم حفظ فيديو الشرح.")
+            await update.message.reply_text("✅ تم حفظ فيديو الشرح بنجاح.")
         else:
-            await update.message.reply_text("يرجى إرسال فيديو.")
+            await update.message.reply_text("⚠️ يرجى إرسال فيديو.")
         return
     await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
 
