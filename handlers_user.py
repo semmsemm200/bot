@@ -304,6 +304,12 @@ async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await query.edit_message_text("⛔ تم حظرك من استخدام البوت. رصيدك مجمد.")
+        return
+    
     user = db.get_user(user_id)
 
     if not user:
@@ -340,6 +346,12 @@ async def withdraw_method_selected(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await query.edit_message_text("⛔ تم حظرك من استخدام البوت. رصيدك مجمد.")
+        return
+    
     method_name = query.data.replace("wmethod_", "")
 
     user = db.get_user(user_id)
@@ -440,6 +452,12 @@ async def withdraw_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await query.answer("⛔ تم حظرك من استخدام البوت. رصيدك مجمد!", show_alert=True)
+        return
+    
     user = db.get_user(user_id)
 
     if not user or user["referral_balance"] <= 0:
@@ -569,6 +587,12 @@ async def my_tasks_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def withdraw_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await update.message.reply_text("⛔ تم حظرك من استخدام البوت. رصيدك مجمد.")
+        return
+    
     user = db.get_user(user_id)
     if not user:
         await update.message.reply_text("⚠️ لم يتم العثور على حسابك.")
@@ -617,6 +641,12 @@ async def referrals_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def withdraw_referral_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
+    # Check if user is banned
+    if db.is_user_banned(user_id):
+        await update.message.reply_text("⛔ تم حظرك من استخدام البوت. رصيدك مجمد.")
+        return
+    
     user = db.get_user(user_id)
     if not user or user["referral_balance"] <= 0:
         await update.message.reply_text("⚠️ رصيد الإحالات فارغ!")
