@@ -442,8 +442,8 @@ async def admin_set_min_w(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_set_minw_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
     
     min_w = int(query.data.split("_")[-1])
@@ -503,8 +503,8 @@ async def admin_method_min(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_set_method_min_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
     
     parts = query.data.split("_")
@@ -537,8 +537,8 @@ async def admin_method_fee(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_set_method_fee_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     if not is_admin(query.from_user.id):
+        await query.answer()
         return
     
     parts = query.data.split("_")
