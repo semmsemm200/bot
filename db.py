@@ -7,14 +7,31 @@ import os
 # Railway provides DATABASE_URL when you add PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-# Also check for individual PostgreSQL variables (Railway alternative format)
-if not DATABASE_URL and os.environ.get('PGDATABASE'):
-    PGUSER = os.environ.get('PGUSER', 'postgres')
-    PGPASSWORD = os.environ.get('PGPASSWORD', '')
-    PGHOST = os.environ.get('PGHOST', 'localhost')
-    PGPORT = os.environ.get('PGPORT', '5432')
-    PGDATABASE = os.environ.get('PGDATABASE', '')
-    DATABASE_URL = f"postgresql://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}"
+print("=" * 60)
+print("🔍 Checking for PostgreSQL connection...")
+print("=" * 60)
+
+if DATABASE_URL:
+    print(f"✅ Found DATABASE_URL environment variable")
+else:
+    print(f"❌ DATABASE_URL not found, checking individual variables...")
+    # Also check for individual PostgreSQL variables (Railway alternative format)
+    PGHOST = os.environ.get('PGHOST')
+    PGUSER = os.environ.get('PGUSER')
+    PGDATABASE = os.environ.get('PGDATABASE')
+    
+    print(f"   PGHOST: {'✅ Found' if PGHOST else '❌ Not found'}")
+    print(f"   PGUSER: {'✅ Found' if PGUSER else '❌ Not found'}")
+    print(f"   PGDATABASE: {'✅ Found' if PGDATABASE else '❌ Not found'}")
+    
+    if PGHOST and PGDATABASE:
+        PGUSER = PGUSER or 'postgres'
+        PGPASSWORD = os.environ.get('PGPASSWORD', '')
+        PGPORT = os.environ.get('PGPORT', '5432')
+        DATABASE_URL = f"postgresql://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}"
+        print(f"✅ Built DATABASE_URL from individual variables")
+    else:
+        print(f"❌ Could not build DATABASE_URL from individual variables")
 
 if DATABASE_URL:
     # Use PostgreSQL
@@ -24,6 +41,7 @@ if DATABASE_URL:
         
         # Fix for Heroku DATABASE_URL (postgres:// -> postgresql://)
         if DATABASE_URL.startswith("postgres://"):
+            print("🔄 Converting postgres:// to postgresql://")
             DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
         
         print("🔄 Connecting to PostgreSQL...")
@@ -31,19 +49,25 @@ if DATABASE_URL:
         conn.autocommit = False  # Ensure we control transactions
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         DB_TYPE = 'postgresql'
+        print("=" * 60)
         print("✅ Connected to PostgreSQL - Data will persist!")
+        print("=" * 60)
     except Exception as e:
+        print("=" * 60)
         print(f"❌ PostgreSQL connection failed: {e}")
         print("⚠️ Falling back to SQLite - DATA WILL BE LOST ON REDEPLOY!")
+        print("=" * 60)
         conn = sqlite3.connect("bot.db", check_same_thread=False)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         DB_TYPE = 'sqlite'
 else:
     # Use SQLite (for local development)
+    print("=" * 60)
     print("⚠️ No PostgreSQL found - using SQLite")
     print("⚠️ WARNING: DATA WILL BE LOST ON RAILWAY REDEPLOY!")
     print("⚠️ Add PostgreSQL in Railway to persist data")
+    print("=" * 60)
     conn = sqlite3.connect("bot.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()

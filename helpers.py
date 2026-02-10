@@ -19,6 +19,10 @@ async def require_subscription(update: Update, context: ContextTypes.DEFAULT_TYP
     if not user_id:
         return False
     
+    # Admins bypass subscription check
+    if is_admin(user_id):
+        return True
+    
     # Check if user exists in database
     user = db.get_user(user_id)
     if not user:
