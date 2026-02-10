@@ -457,7 +457,16 @@ def main():
             pool_timeout=30.0
         )
         
-        app = ApplicationBuilder().token(TOKEN).request(request).build()
+        app = (
+            ApplicationBuilder()
+            .token(TOKEN)
+            .request(request)
+            .get_updates_read_timeout(30.0)
+            .get_updates_write_timeout(30.0)
+            .get_updates_connect_timeout(30.0)
+            .get_updates_pool_timeout(30.0)
+            .build()
+        )
         
         print("Adding handlers...")
         app.add_handler(CommandHandler("start", start))
@@ -472,12 +481,11 @@ def main():
         print("=" * 50)
         print("البوت بدأ يشتغل...")
         
-        # Run with increased timeout and retry
+        # Run with drop_pending_updates to avoid conflicts
         app.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,
-            timeout=30,
-            pool_timeout=30
+            drop_pending_updates=True
+        )
         )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
