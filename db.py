@@ -3,24 +3,47 @@ import datetime
 import json
 import os
 
-# Check if DATABASE_URL is set (for PostgreSQL on Heroku/Render)
+# Check for PostgreSQL connection
+# Railway provides DATABASE_URL when you add PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Also check for individual PostgreSQL variables (Railway alternative format)
+if not DATABASE_URL and os.environ.get('PGDATABASE'):
+    PGUSER = os.environ.get('PGUSER', 'postgres')
+    PGPASSWORD = os.environ.get('PGPASSWORD', '')
+    PGHOST = os.environ.get('PGHOST', 'localhost')
+    PGPORT = os.environ.get('PGPORT', '5432')
+    PGDATABASE = os.environ.get('PGDATABASE', '')
+    DATABASE_URL = f"postgresql://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}"
 
 if DATABASE_URL:
     # Use PostgreSQL
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-    
-    # Fix for Heroku DATABASE_URL (postgres:// -> postgresql://)
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    conn.autocommit = False  # Ensure we control transactions
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    DB_TYPE = 'postgresql'
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Fix for Heroku DATABASE_URL (postgres:// -> postgresql://)
+        if DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        print("🔄 Connecting to PostgreSQL...")
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        conn.autocommit = False  # Ensure we control transactions
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        DB_TYPE = 'postgresql'
+        print("✅ Connected to PostgreSQL - Data will persist!")
+    except Exception as e:
+        print(f"❌ PostgreSQL connection failed: {e}")
+        print("⚠️ Falling back to SQLite - DATA WILL BE LOST ON REDEPLOY!")
+        conn = sqlite3.connect("bot.db", check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        DB_TYPE = 'sqlite'
 else:
     # Use SQLite (for local development)
+    print("⚠️ No PostgreSQL found - using SQLite")
+    print("⚠️ WARNING: DATA WILL BE LOST ON RAILWAY REDEPLOY!")
+    print("⚠️ Add PostgreSQL in Railway to persist data")
     conn = sqlite3.connect("bot.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
