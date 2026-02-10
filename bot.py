@@ -447,7 +447,17 @@ def main():
     
     try:
         print("Building application...")
-        app = ApplicationBuilder().token(TOKEN).build()
+        # Increase timeouts for Railway
+        from telegram.request import HTTPXRequest
+        request = HTTPXRequest(
+            connection_pool_size=8,
+            connect_timeout=30.0,
+            read_timeout=30.0,
+            write_timeout=30.0,
+            pool_timeout=30.0
+        )
+        
+        app = ApplicationBuilder().token(TOKEN).request(request).build()
         
         print("Adding handlers...")
         app.add_handler(CommandHandler("start", start))
@@ -462,7 +472,13 @@ def main():
         print("=" * 50)
         print("البوت بدأ يشتغل...")
         
-        app.run_polling()
+        # Run with increased timeout and retry
+        app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            timeout=30,
+            pool_timeout=30
+        )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
         import traceback
