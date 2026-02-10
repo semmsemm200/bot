@@ -552,10 +552,19 @@ def move_reserved_to_available(user_id, amount):
 # ---- Tasks ----
 def create_task(user_id, price):
     try:
-        execute_query("INSERT INTO tasks (user_id, price, description) VALUES (?, ?, ?)",
-                       (user_id, price, "مهمة جديدة"))
-        conn.commit()
-        return cursor.lastrowid
+        if DB_TYPE == 'postgresql':
+            # PostgreSQL: use RETURNING to get the ID
+            execute_query("INSERT INTO tasks (user_id, price, description) VALUES (?, ?, ?) RETURNING id",
+                           (user_id, price, "مهمة جديدة"))
+            result = cursor.fetchone()
+            conn.commit()
+            return result['id'] if result else None
+        else:
+            # SQLite: use lastrowid
+            execute_query("INSERT INTO tasks (user_id, price, description) VALUES (?, ?, ?)",
+                           (user_id, price, "مهمة جديدة"))
+            conn.commit()
+            return cursor.lastrowid
     except Exception as e:
         if DB_TYPE == 'postgresql':
             conn.rollback()
@@ -732,10 +741,19 @@ def get_reserved_tasks_by_user(user_id):
 # ---- Withdrawals ----
 def create_withdrawal(user_id, method, data, amount):
     try:
-        execute_query("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?)",
-                       (user_id, method, data, amount))
-        conn.commit()
-        return cursor.lastrowid
+        if DB_TYPE == 'postgresql':
+            # PostgreSQL: use RETURNING to get the ID
+            execute_query("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?) RETURNING id",
+                           (user_id, method, data, amount))
+            result = cursor.fetchone()
+            conn.commit()
+            return result['id'] if result else None
+        else:
+            # SQLite: use lastrowid
+            execute_query("INSERT INTO withdrawals (user_id, method, data, amount) VALUES (?, ?, ?, ?)",
+                           (user_id, method, data, amount))
+            conn.commit()
+            return cursor.lastrowid
     except Exception as e:
         if DB_TYPE == 'postgresql':
             conn.rollback()
