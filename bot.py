@@ -506,30 +506,25 @@ def main():
         
         # Check if running on Railway (has PORT environment variable)
         PORT = os.environ.get('PORT')
-        RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
-        RAILWAY_STATIC_URL = os.environ.get('RAILWAY_STATIC_URL')
         
-        if PORT and (RAILWAY_PUBLIC_DOMAIN or RAILWAY_STATIC_URL):
+        if PORT:
             # Use Webhook mode on Railway
             print("=" * 50)
             print("🌐 Running in WEBHOOK mode (Railway)")
             print("=" * 50)
-            
-            # Determine webhook URL
-            if RAILWAY_PUBLIC_DOMAIN:
-                WEBHOOK_URL = f"https://{RAILWAY_PUBLIC_DOMAIN}"
-            else:
-                WEBHOOK_URL = RAILWAY_STATIC_URL
-            
-            print(f"📡 Webhook URL: {WEBHOOK_URL}")
             print(f"🌐 Port: {PORT}")
+            print("⚠️ Note: Webhook URL will be set by Railway automatically")
+            print("=" * 50)
+            print("✅ Bot started successfully!")
+            print("=" * 50)
+            print("البوت بدأ يشتغل...")
             
-            # Run webhook
+            # Run webhook - Railway will handle the URL
             app.run_webhook(
                 listen="0.0.0.0",
                 port=int(PORT),
                 url_path="",
-                webhook_url=WEBHOOK_URL,
+                webhook_url=None,  # Let Railway handle it
                 allowed_updates=Update.ALL_TYPES,
                 drop_pending_updates=True
             )
@@ -537,6 +532,8 @@ def main():
             # Use Polling mode locally
             print("=" * 50)
             print("🔄 Running in POLLING mode (Local)")
+            print("=" * 50)
+            print("✅ Bot started successfully!")
             print("=" * 50)
             print("البوت بدأ يشتغل...")
             
