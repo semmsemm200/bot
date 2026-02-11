@@ -486,7 +486,6 @@ def main():
             allowed_updates=Update.ALL_TYPES,
             drop_pending_updates=True
         )
-        )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
         import traceback
