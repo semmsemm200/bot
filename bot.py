@@ -1,3 +1,4 @@
+import os
 import db
 from config import TOKEN, ADMIN_ID
 from helpers import is_admin, get_main_menu_keyboard, send_to_admins, send_photo_to_admins
@@ -503,16 +504,47 @@ def main():
         app.add_handler(MessageHandler(filters.VIDEO, handle_video))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        print("=" * 50)
-        print("✅ Bot started successfully!")
-        print("=" * 50)
-        print("البوت بدأ يشتغل...")
+        # Check if running on Railway (has PORT environment variable)
+        PORT = os.environ.get('PORT')
+        RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+        RAILWAY_STATIC_URL = os.environ.get('RAILWAY_STATIC_URL')
         
-        # Run with drop_pending_updates to avoid conflicts
-        app.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
-        )
+        if PORT and (RAILWAY_PUBLIC_DOMAIN or RAILWAY_STATIC_URL):
+            # Use Webhook mode on Railway
+            print("=" * 50)
+            print("🌐 Running in WEBHOOK mode (Railway)")
+            print("=" * 50)
+            
+            # Determine webhook URL
+            if RAILWAY_PUBLIC_DOMAIN:
+                WEBHOOK_URL = f"https://{RAILWAY_PUBLIC_DOMAIN}"
+            else:
+                WEBHOOK_URL = RAILWAY_STATIC_URL
+            
+            print(f"📡 Webhook URL: {WEBHOOK_URL}")
+            print(f"🌐 Port: {PORT}")
+            
+            # Run webhook
+            app.run_webhook(
+                listen="0.0.0.0",
+                port=int(PORT),
+                url_path="",
+                webhook_url=WEBHOOK_URL,
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True
+            )
+        else:
+            # Use Polling mode locally
+            print("=" * 50)
+            print("🔄 Running in POLLING mode (Local)")
+            print("=" * 50)
+            print("البوت بدأ يشتغل...")
+            
+            # Run with drop_pending_updates to avoid conflicts
+            app.run_polling(
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True
+            )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
         import traceback
