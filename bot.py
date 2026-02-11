@@ -137,6 +137,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ يرجى إرسال رقم صحيح فقط.")
         return
 
+    # Admin: adding new admin
+    if context.user_data.get("admin_adding_admin") and is_admin(user_id):
+        context.user_data.pop("admin_adding_admin")
+        try:
+            new_admin_id = int(text)
+            if is_admin(new_admin_id):
+                await update.message.reply_text("⚠️ هذا المستخدم مشرف بالفعل.")
+                return
+            db.add_admin(new_admin_id)
+            await update.message.reply_text(f"✅ تم إضافة المشرف {new_admin_id} بنجاح.")
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
+    # Admin: removing admin
+    if context.user_data.get("admin_removing_admin") and is_admin(user_id):
+        context.user_data.pop("admin_removing_admin")
+        try:
+            admin_id_to_remove = int(text)
+            if admin_id_to_remove == ADMIN_ID:
+                await update.message.reply_text("❌ لا يمكن إزالة المشرف الرئيسي.")
+                return
+            if not is_admin(admin_id_to_remove):
+                await update.message.reply_text("⚠️ هذا المستخدم ليس مشرفاً.")
+                return
+            db.remove_admin(admin_id_to_remove)
+            await update.message.reply_text(f"✅ تم إزالة المشرف {admin_id_to_remove} بنجاح.")
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
     # User: withdrawal data
     if context.user_data.get("withdraw_method"):
         method_name = context.user_data.pop("withdraw_method")
