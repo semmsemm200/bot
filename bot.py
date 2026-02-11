@@ -461,10 +461,6 @@ def main():
             ApplicationBuilder()
             .token(TOKEN)
             .request(request)
-            .get_updates_read_timeout(30.0)
-            .get_updates_write_timeout(30.0)
-            .get_updates_connect_timeout(30.0)
-            .get_updates_pool_timeout(30.0)
             .build()
         )
         
