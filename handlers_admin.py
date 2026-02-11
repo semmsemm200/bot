@@ -1177,6 +1177,7 @@ async def admin_reward_select_user(update: Update, context: ContextTypes.DEFAULT
          InlineKeyboardButton("100 جنيه", callback_data=f"admin_reward_amount_{user_id}_100")],
         [InlineKeyboardButton("200 جنيه", callback_data=f"admin_reward_amount_{user_id}_200"),
          InlineKeyboardButton("500 جنيه", callback_data=f"admin_reward_amount_{user_id}_500")],
+        [InlineKeyboardButton("✏️ مبلغ مخصص", callback_data=f"admin_reward_custom_{user_id}")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="admin_reward_user")]
     ]
     
@@ -1212,6 +1213,30 @@ async def admin_reward_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"👤 المستخدم: {user['username'] or user_id} (ID: {user_id})\n"
         f"💰 المبلغ المضاف: {amount} جنيه\n"
         f"💵 الرصيد الجديد: {user['available']} جنيه"
+    )
+
+
+async def admin_reward_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle custom reward amount"""
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user(user_id)
+    if not user:
+        await query.answer("المستخدم غير موجود", show_alert=True)
+        return
+    
+    # Store user_id in context for later use
+    context.user_data["admin_reward_custom_user"] = user_id
+    
+    await query.edit_message_text(
+        f"✏️ إضافة مكافأة مخصصة\n\n"
+        f"👤 المستخدم: {user['username'] or user_id}\n"
+        f"💰 الرصيد الحالي: {user['available']} جنيه\n\n"
+        f"📝 أرسل المبلغ الذي تريد إضافته (رقم فقط):"
     )
 
 

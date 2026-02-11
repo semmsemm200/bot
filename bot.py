@@ -26,7 +26,7 @@ from handlers_admin import (
     admin_add_method, admin_search_user, admin_view_user, admin_clear_balance, admin_do_clear_balance,
     admin_cancel_task_prompt, admin_do_cancel_task, admin_manage_admins,
     admin_add_admin, admin_remove_admin, admin_set_video,
-    admin_reward_user, admin_reward_select_user, admin_reward_amount,
+    admin_reward_user, admin_reward_select_user, admin_reward_amount, admin_reward_custom,
     admin_ban_user, admin_do_ban_user, admin_toggle_bot_with_notification
 )
 
@@ -167,6 +167,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ تم إزالة المشرف {admin_id_to_remove} بنجاح.")
         except ValueError:
             await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
+    # Admin: custom reward amount
+    if context.user_data.get("admin_reward_custom_user") and is_admin(user_id):
+        reward_user_id = context.user_data.pop("admin_reward_custom_user")
+        try:
+            amount = int(text)
+            if amount <= 0:
+                await update.message.reply_text("❌ يجب أن يكون المبلغ أكبر من صفر.")
+                return
+            
+            db.add_to_available(reward_user_id, amount)
+            user = db.get_user(reward_user_id)
+            
+            try:
+                await context.bot.send_message(reward_user_id, f"🎁 تم إضافة مكافأة {amount} جنيه لحسابك!")
+                await update.message.reply_text(
+                    f"✅ تم إضافة المكافأة بنجاح\n"
+                    f"👤 المستخدم: {user['username'] or reward_user_id} (ID: {reward_user_id})\n"
+                    f"💰 المبلغ المضاف: {amount} جنيه\n"
+                    f"💵 الرصيد الجديد: {user['available']} جنيه"
+                )
+            except Exception as e:
+                await update.message.reply_text(
+                    f"✅ تم إضافة المكافأة بنجاح\n"
+                    f"👤 المستخدم: {reward_user_id}\n"
+                    f"💰 المبلغ المضاف: {amount} جنيه\n"
+                    f"⚠️ لكن تعذر إرسال الإشعار للمستخدم"
+                )
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال رقم صحيح فقط.")
         return
 
     # User: withdrawal data
@@ -440,6 +471,8 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_reward_select_user(update, context)
     elif data.startswith("admin_reward_amount_"):
         await admin_reward_amount(update, context)
+    elif data.startswith("admin_reward_custom_"):
+        await admin_reward_custom(update, context)
     elif data == "admin_ban_user":
         await admin_ban_user(update, context)
     elif data.startswith("admin_do_ban_"):
