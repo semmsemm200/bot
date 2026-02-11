@@ -873,7 +873,7 @@ def get_leaderboard():
              WHERE r2.referrer_id = r.referrer_id AND t2.status IN ('approved','released')) as task_count
             FROM referrals r
             JOIN users u ON r.referrer_id = u.id
-            GROUP BY r.referrer_id
+            GROUP BY r.referrer_id, u.username
             ORDER BY ref_count DESC
         """)
     except Exception as e:
