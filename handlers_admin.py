@@ -1099,33 +1099,62 @@ async def admin_reward_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
     
-    # Get all users and show as buttons
-    users = db.get_all_users()
-    if not users:
-        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    keyboard = []
-    for u in users[:30]:
-        # Convert sqlite3.Row to dict
-        user_dict = dict(u)
+    try:
+        # Get all users and show as buttons
+        users = db.get_all_users()
+        print(f"[DEBUG] Found {len(users) if users else 0} users")
         
-        user_id = user_dict.get('id', 0)
-        username = user_dict.get('username', None)
-        available = user_dict.get('available', 0)
+        if not users:
+            keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+            await query.edit_message_text(
+                "⚠️ لا يوجد مستخدمين في قاعدة البيانات.\n\n"
+                "💡 يجب أن يضغط مستخدم واحد على الأقل /start أولاً.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
         
-        display_name = username if username else str(user_id)
-        username_display = f"@{username}" if username else ""
-        button_text = f"🎁 {display_name} {username_display} (رصيد: {available})"
+        keyboard = []
+        for u in users[:30]:
+            try:
+                # Convert sqlite3.Row to dict
+                user_dict = dict(u)
+                
+                user_id = user_dict.get('id', 0)
+                username = user_dict.get('username', None)
+                available = user_dict.get('available', 0)
+                
+                display_name = username if username else str(user_id)
+                username_display = f"@{username}" if username else ""
+                button_text = f"🎁 {display_name} {username_display} (رصيد: {available})"
+                
+                keyboard.append([InlineKeyboardButton(
+                    button_text,
+                    callback_data=f"admin_reward_select_{user_id}"
+                )])
+            except Exception as e:
+                print(f"[ERROR] Error processing user: {e}")
+                continue
         
-        keyboard.append([InlineKeyboardButton(
-            button_text,
-            callback_data=f"admin_reward_select_{user_id}"
-        )])
-    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-    
-    await query.edit_message_text("🎁 اختر مستخدم لإضافة مكافأة:", reply_markup=InlineKeyboardMarkup(keyboard))
+        if not keyboard:
+            keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+            await query.edit_message_text(
+                "⚠️ حدث خطأ في معالجة المستخدمين.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+            
+        keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+        
+        await query.edit_message_text(
+            f"🎁 اختر مستخدم لإضافة مكافأة:\n\n"
+            f"📊 عدد المستخدمين: {len(users)}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        print(f"[ERROR] admin_reward_user: {e}")
+        import traceback
+        traceback.print_exc()
+        await query.answer("❌ حدث خطأ! تحقق من Logs", show_alert=True)
 
 
 async def admin_reward_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
