@@ -504,44 +504,16 @@ def main():
         app.add_handler(MessageHandler(filters.VIDEO, handle_video))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        # Check if running on Railway (has PORT environment variable)
-        PORT = os.environ.get('PORT')
+        print("=" * 50)
+        print("✅ Bot started successfully!")
+        print("=" * 50)
+        print("البوت بدأ يشتغل...")
         
-        if PORT:
-            # Use Webhook mode on Railway
-            print("=" * 50)
-            print("🌐 Running in WEBHOOK mode (Railway)")
-            print("=" * 50)
-            print(f"🌐 Port: {PORT}")
-            print("⚠️ Note: Webhook URL will be set by Railway automatically")
-            print("=" * 50)
-            print("✅ Bot started successfully!")
-            print("=" * 50)
-            print("البوت بدأ يشتغل...")
-            
-            # Run webhook - Railway will handle the URL
-            app.run_webhook(
-                listen="0.0.0.0",
-                port=int(PORT),
-                url_path="",
-                webhook_url=None,  # Let Railway handle it
-                allowed_updates=Update.ALL_TYPES,
-                drop_pending_updates=True
-            )
-        else:
-            # Use Polling mode locally
-            print("=" * 50)
-            print("🔄 Running in POLLING mode (Local)")
-            print("=" * 50)
-            print("✅ Bot started successfully!")
-            print("=" * 50)
-            print("البوت بدأ يشتغل...")
-            
-            # Run with drop_pending_updates to avoid conflicts
-            app.run_polling(
-                allowed_updates=Update.ALL_TYPES,
-                drop_pending_updates=True
-            )
+        # Use Polling with drop_pending_updates to avoid conflicts
+        app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
         import traceback
