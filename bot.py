@@ -483,6 +483,17 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not task:
             await update.message.reply_text("❌ المهمة غير موجودة.")
             return
+        
+        # Check if user_id matches task owner
+        if task['user_id'] != user_id:
+            print(f"[WARNING] User ID mismatch! Task owner: {task['user_id']}, Proof sender: {user_id}")
+            await update.message.reply_text(
+                f"⚠️ تحذير: هذه المهمة ليست لك!\n"
+                f"المهمة #{task_id} تخص المستخدم {task['user_id']}\n"
+                f"أنت: {user_id}"
+            )
+            # Still send to admin but with warning
+        
         db.update_task_proof(task_id, file_id)
         await update.message.reply_text(f"✅ تم إرسال الإثبات للمهمة #{task_id} بنجاح. في انتظار مراجعة المشرف.")
         kb = [
@@ -490,8 +501,16 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("رفض", callback_data=f"admin_reject_t_{task_id}")],
             [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
         ]
+        
+        warning_msg = ""
+        if task['user_id'] != user_id:
+            warning_msg = f"\n⚠️ تحذير: مُرسل الإثبات ({user_id}) مختلف عن صاحب المهمة ({task['user_id']})!"
+        
         await send_photo_to_admins(context, file_id,
-            f"📸 إثبات المهمة #{task_id}\n👤 مستخدم: {task['user_id']}\n💰 السعر: {task['price']} جنيه",
+            f"📸 إثبات المهمة #{task_id}\n"
+            f"👤 صاحب المهمة: {task['user_id']}\n"
+            f"📤 مُرسل الإثبات: {user_id}\n"
+            f"💰 السعر: {task['price']} جنيه{warning_msg}",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
@@ -514,7 +533,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("خطأ في التنفيذ", callback_data=f"admin_error_t_{task_id}")],
         ]
         await send_photo_to_admins(context, file_id,
-            f"📸 إثبات معاد للمهمة #{task_id}\n👤 مستخدم: {task['user_id']}\n💰 السعر: {task['price']} جنيه",
+            f"📸 إثبات معاد للمهمة #{task_id}\n"
+            f"👤 صاحب المهمة: {task['user_id']}\n"
+            f"📤 مُرسل الإثبات: {user_id}\n"
+            f"💰 السعر: {task['price']} جنيه",
             reply_markup=InlineKeyboardMarkup(kb)
         )
         return
