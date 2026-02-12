@@ -1,5 +1,6 @@
 import os
 import db
+import patch_referral_debug  # Add debug logging for referrals
 from config import TOKEN, ADMIN_ID
 from helpers import is_admin, get_main_menu_keyboard, send_to_admins, send_photo_to_admins
 from handlers_user import (
