@@ -862,31 +862,14 @@ async def admin_search_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
     
-    # Get all users and show as buttons
-    users = db.get_all_users()
-    if not users:
-        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    keyboard = []
-    for u in users[:30]:  # Show first 30 users
-        # Convert sqlite3.Row to dict
-        user_dict = dict(u)
-        
-        user_id = user_dict.get('id', 0)
-        username = user_dict.get('username', None)
-        display_name = username if username else str(user_id)
-        username_display = f"@{username}" if username else ""
-        button_text = f"👤 {display_name} {username_display} (ID: {user_id})"
-        
-        keyboard.append([InlineKeyboardButton(
-            button_text,
-            callback_data=f"admin_view_user_{user_id}"
-        )])
-    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-    
-    await query.edit_message_text("👥 اختر مستخدم:", reply_markup=InlineKeyboardMarkup(keyboard))
+    # Ask for user ID directly
+    context.user_data["admin_search_user_waiting_id"] = True
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text(
+        "🔍 بحث عن مستخدم\n\n"
+        "📝 أرسل ID المستخدم الذي تريد البحث عنه:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def admin_view_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1156,36 +1139,14 @@ async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
     
-    # Get all users and show as buttons
-    users = db.get_all_users()
-    if not users:
-        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    keyboard = []
-    for u in users[:30]:
-        # Convert sqlite3.Row to dict
-        user_dict = dict(u)
-        
-        user_id = user_dict.get('id', 0)
-        username = user_dict.get('username', None)
-        
-        is_banned = db.is_user_banned(user_id)
-        status = "🚫 محظور" if is_banned else "✅ نشط"
-        action = "رفع الحظر" if is_banned else "حظر"
-        
-        display_name = username if username else str(user_id)
-        username_display = f"@{username}" if username else ""
-        button_text = f"{status} {display_name} {username_display} - {action}"
-        
-        keyboard.append([InlineKeyboardButton(
-            button_text,
-            callback_data=f"admin_do_ban_{user_id}"
-        )])
-    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-    
-    await query.edit_message_text("🚫 اختر مستخدم للحظر/رفع الحظر:", reply_markup=InlineKeyboardMarkup(keyboard))
+    # Ask for user ID directly
+    context.user_data["admin_ban_user_waiting_id"] = True
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text(
+        "🚫 حظر/رفع حظر مستخدم\n\n"
+        "📝 أرسل ID المستخدم:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def admin_do_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):

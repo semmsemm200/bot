@@ -292,6 +292,88 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ يرجى إرسال رقم المهمة صحيح (رقم فقط).")
         return
 
+    # Admin: search user - waiting for ID
+    if context.user_data.get("admin_search_user_waiting_id") and is_admin(user_id):
+        context.user_data.pop("admin_search_user_waiting_id")
+        try:
+            search_user_id = int(text)
+            user = db.get_user(search_user_id)
+            if not user:
+                await update.message.reply_text("❌ المستخدم غير موجود في قاعدة البيانات.")
+                return
+            
+            # Get user stats
+            ref_count = db.get_referral_count(search_user_id)
+            ref_tasks = db.get_referral_completed_tasks(search_user_id)
+            task_stats = db.get_user_task_stats(search_user_id)
+            
+            msg = "👤 بيانات المستخدم:\n\n"
+            msg += f"🆔 ID: {user['id']}\n"
+            msg += f"👤 Username: {user['username'] or 'لا يوجد'}\n"
+            msg += f"📛 الاسم: {user.get('first_name', 'لا يوجد')}\n"
+            msg += f"💰 رصيد متاح: {user['available']} جنيه\n"
+            msg += f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
+            msg += f"👥 رصيد إحالات: {user['referral_balance']} جنيه\n"
+            msg += f"📊 إجمالي المهام: {task_stats['total']}\n"
+            msg += f"✅ مهام مقبولة: {task_stats['approved']}\n"
+            msg += f"❌ مهام مرفوضة: {task_stats['rejected']}\n"
+            msg += f"🔗 عدد الإحالات: {ref_count}\n"
+            msg += f"📋 مهام المُحالين: {ref_tasks}\n"
+            
+            is_banned = db.is_user_banned(search_user_id)
+            msg += f"🚫 الحالة: {'محظور' if is_banned else 'نشط'}"
+            
+            await update.message.reply_text(msg)
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
+    # Admin: ban user - waiting for ID
+    if context.user_data.get("admin_ban_user_waiting_id") and is_admin(user_id):
+        context.user_data.pop("admin_ban_user_waiting_id")
+        try:
+            ban_user_id = int(text)
+            user = db.get_user(ban_user_id)
+            if not user:
+                await update.message.reply_text("❌ المستخدم غير موجود في قاعدة البيانات.")
+                return
+            
+            is_banned = db.is_user_banned(ban_user_id)
+            
+            if is_banned:
+                # Unban
+                db.unban_user(ban_user_id)
+                try:
+                    await context.bot.send_message(ban_user_id, "✅ تم رفع الحظر عنك. يمكنك استخدام البوت الآن.")
+                    await update.message.reply_text(
+                        f"✅ تم رفع الحظر عن المستخدم\n"
+                        f"👤 {user['username'] or ban_user_id} (ID: {ban_user_id})"
+                    )
+                except Exception:
+                    await update.message.reply_text(
+                        f"✅ تم رفع الحظر عن المستخدم\n"
+                        f"👤 {user['username'] or ban_user_id} (ID: {ban_user_id})\n"
+                        f"⚠️ لكن تعذر إرسال الإشعار"
+                    )
+            else:
+                # Ban
+                db.ban_user(ban_user_id)
+                try:
+                    await context.bot.send_message(ban_user_id, "⛔ تم حظرك من استخدام البوت.")
+                    await update.message.reply_text(
+                        f"🚫 تم حظر المستخدم\n"
+                        f"👤 {user['username'] or ban_user_id} (ID: {ban_user_id})"
+                    )
+                except Exception:
+                    await update.message.reply_text(
+                        f"🚫 تم حظر المستخدم\n"
+                        f"👤 {user['username'] or ban_user_id} (ID: {ban_user_id})\n"
+                        f"⚠️ لكن تعذر إرسال الإشعار"
+                    )
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
     # Admin: custom reward amount
     if context.user_data.get("admin_reward_custom_user") and is_admin(user_id):
         reward_user_id = context.user_data.pop("admin_reward_custom_user")
