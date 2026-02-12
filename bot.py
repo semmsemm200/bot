@@ -213,9 +213,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
         return
-        except ValueError:
-            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
-        return
 
     # Admin: removing admin
     if context.user_data.get("admin_removing_admin") and is_admin(user_id):
