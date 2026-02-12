@@ -231,6 +231,67 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
         return
 
+    # Admin: cancel task - waiting for task ID
+    if context.user_data.get("admin_cancel_task_waiting_id") and is_admin(user_id):
+        context.user_data.pop("admin_cancel_task_waiting_id")
+        try:
+            task_id = int(text)
+            task = db.get_task(task_id)
+            if not task:
+                await update.message.reply_text("❌ المهمة غير موجودة في قاعدة البيانات.")
+                return
+            
+            # Get user info
+            user = db.get_user(task["user_id"])
+            
+            # Status mapping
+            status_map = {
+                "pending": "⏳ معلقة",
+                "data_sent": "📤 بيانات مرسلة",
+                "proof_submitted": "📸 إثبات مرسل",
+                "approved": "✅ مقبولة (محجوز)",
+                "released": "✅ مقبولة (متاح)",
+                "rejected": "❌ مرفوضة",
+                "cancelled": "🚫 ملغاة",
+                "error": "⚠️ خطأ",
+                "error_resubmitted": "📸 إثبات معاد",
+            }
+            status_text = status_map.get(task["status"], task["status"])
+            
+            # Build message with task and user info
+            msg = "📋 بيانات المهمة:\n\n"
+            msg += f"🆔 رقم المهمة: #{task['id']}\n"
+            msg += f"📊 الحالة: {status_text}\n"
+            msg += f"💰 السعر: {task['price']} جنيه\n"
+            msg += f"📅 تاريخ الإنشاء: {task['created_at']}\n"
+            
+            if task.get('admin_data'):
+                msg += f"📝 البيانات المرسلة: {task['admin_data'][:50]}...\n"
+            
+            msg += "\n👤 بيانات المستخدم:\n\n"
+            if user:
+                msg += f"🆔 ID: {user['id']}\n"
+                msg += f"👤 Username: {user['username'] or 'لا يوجد'}\n"
+                msg += f"💰 رصيد متاح: {user['available']} جنيه\n"
+                msg += f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
+                msg += f"👥 رصيد إحالات: {user['referral_balance']} جنيه\n"
+            else:
+                msg += f"🆔 ID: {task['user_id']}\n"
+                msg += "⚠️ بيانات المستخدم غير متوفرة\n"
+            
+            msg += "\n⚠️ هل تريد إلغاء هذه المهمة؟"
+            
+            # Confirmation button
+            keyboard = [
+                [InlineKeyboardButton("✅ تأكيد الإلغاء", callback_data=f"admin_do_cancel_{task_id}")],
+                [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]
+            ]
+            
+            await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال رقم المهمة صحيح (رقم فقط).")
+        return
+
     # Admin: custom reward amount
     if context.user_data.get("admin_reward_custom_user") and is_admin(user_id):
         reward_user_id = context.user_data.pop("admin_reward_custom_user")

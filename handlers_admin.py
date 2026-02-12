@@ -967,29 +967,14 @@ async def admin_cancel_task_prompt(update: Update, context: ContextTypes.DEFAULT
     if not is_admin(query.from_user.id):
         return
     
-    # Get incomplete tasks
-    tasks = db.get_incomplete_tasks()
-    if not tasks:
-        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-        await query.edit_message_text("✅ لا توجد مهام غير مكتملة.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    msg = "❌ المهام الغير مكتملة:\n\n"
-    keyboard = []
-    for t in tasks[:15]:
-        status_map = {
-            "pending": "⏳ معلقة",
-            "data_sent": "📤 بيانات مرسلة",
-            "proof_submitted": "📸 إثبات مرسل",
-            "error": "⚠️ خطأ",
-            "error_resubmitted": "📸 إثبات معاد",
-        }
-        status = status_map.get(t["status"], t["status"])
-        msg += f"#{t['id']} | مستخدم: {t['user_id']} | {status}\n"
-        keyboard.append([InlineKeyboardButton(f"❌ إلغاء المهمة #{t['id']}", callback_data=f"admin_do_cancel_{t['id']}")])
-    
-    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    # Ask for task ID directly
+    context.user_data["admin_cancel_task_waiting_id"] = True
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text(
+        "❌ إلغاء مهمة\n\n"
+        "📝 أرسل رقم المهمة (Task ID) التي تريد إلغاءها:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 # ==================== ADMIN MANAGE ADMINS ====================
