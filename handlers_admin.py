@@ -934,42 +934,14 @@ async def admin_clear_balance(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not is_admin(query.from_user.id):
         return
     
-    # Get all users and show as buttons
-    users = db.get_all_users()
-    if not users:
-        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-        await query.edit_message_text("لا يوجد مستخدمين.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    keyboard = []
-    for u in users[:30]:
-        # Convert sqlite3.Row to dict
-        user_dict = dict(u)
-        
-        user_id = user_dict.get('id', 0)
-        username = user_dict.get('username', None)
-        available = user_dict.get('available', 0)
-        reserved = user_dict.get('reserved', 0)
-        referral_balance = user_dict.get('referral_balance', 0)
-        
-        total = available + reserved + referral_balance
-        if total > 0:  # Only show users with balance
-            display_name = username if username else str(user_id)
-            username_display = f"@{username}" if username else ""
-            button_text = f"🗑️ {display_name} {username_display} - {total} جنيه"
-            
-            keyboard.append([InlineKeyboardButton(
-                button_text,
-                callback_data=f"admin_do_clear_{user_id}"
-            )])
-    
-    if not keyboard:
-        keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-        await query.edit_message_text("لا يوجد مستخدمين برصيد.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-    await query.edit_message_text("🗑️ اختر مستخدم لمسح رصيده:", reply_markup=InlineKeyboardMarkup(keyboard))
+    # Ask for user ID directly
+    context.user_data["admin_clear_balance_waiting_id"] = True
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text(
+        "🗑️ مسح رصيد مستخدم\n\n"
+        "📝 أرسل ID المستخدم الذي تريد مسح رصيده:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def admin_do_clear_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1099,62 +1071,14 @@ async def admin_reward_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(query.from_user.id):
         return
     
-    try:
-        # Get all users and show as buttons
-        users = db.get_all_users()
-        print(f"[DEBUG] Found {len(users) if users else 0} users")
-        
-        if not users:
-            keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-            await query.edit_message_text(
-                "⚠️ لا يوجد مستخدمين في قاعدة البيانات.\n\n"
-                "💡 يجب أن يضغط مستخدم واحد على الأقل /start أولاً.",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-        
-        keyboard = []
-        for u in users[:30]:
-            try:
-                # Convert sqlite3.Row to dict
-                user_dict = dict(u)
-                
-                user_id = user_dict.get('id', 0)
-                username = user_dict.get('username', None)
-                available = user_dict.get('available', 0)
-                
-                display_name = username if username else str(user_id)
-                username_display = f"@{username}" if username else ""
-                button_text = f"🎁 {display_name} {username_display} (رصيد: {available})"
-                
-                keyboard.append([InlineKeyboardButton(
-                    button_text,
-                    callback_data=f"admin_reward_select_{user_id}"
-                )])
-            except Exception as e:
-                print(f"[ERROR] Error processing user: {e}")
-                continue
-        
-        if not keyboard:
-            keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
-            await query.edit_message_text(
-                "⚠️ حدث خطأ في معالجة المستخدمين.",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-            
-        keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
-        
-        await query.edit_message_text(
-            f"🎁 اختر مستخدم لإضافة مكافأة:\n\n"
-            f"📊 عدد المستخدمين: {len(users)}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    except Exception as e:
-        print(f"[ERROR] admin_reward_user: {e}")
-        import traceback
-        traceback.print_exc()
-        await query.answer("❌ حدث خطأ! تحقق من Logs", show_alert=True)
+    # Ask for user ID directly
+    context.user_data["admin_reward_waiting_id"] = True
+    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    await query.edit_message_text(
+        "🎁 إضافة مكافأة\n\n"
+        "📝 أرسل ID المستخدم الذي تريد إضافة مكافأة له:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def admin_reward_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -152,6 +152,71 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
         return
 
+    # Admin: reward user - waiting for ID
+    if context.user_data.get("admin_reward_waiting_id") and is_admin(user_id):
+        context.user_data.pop("admin_reward_waiting_id")
+        try:
+            reward_user_id = int(text)
+            user = db.get_user(reward_user_id)
+            if not user:
+                await update.message.reply_text("❌ المستخدم غير موجود في قاعدة البيانات.")
+                return
+            
+            # Show amount buttons
+            keyboard = [
+                [InlineKeyboardButton("10 جنيه", callback_data=f"admin_reward_amount_{reward_user_id}_10"),
+                 InlineKeyboardButton("20 جنيه", callback_data=f"admin_reward_amount_{reward_user_id}_20")],
+                [InlineKeyboardButton("50 جنيه", callback_data=f"admin_reward_amount_{reward_user_id}_50"),
+                 InlineKeyboardButton("100 جنيه", callback_data=f"admin_reward_amount_{reward_user_id}_100")],
+                [InlineKeyboardButton("200 جنيه", callback_data=f"admin_reward_amount_{reward_user_id}_200"),
+                 InlineKeyboardButton("500 جنيه", callback_data=f"admin_reward_amount_{reward_user_id}_500")],
+                [InlineKeyboardButton("✏️ مبلغ مخصص", callback_data=f"admin_reward_custom_{reward_user_id}")],
+                [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]
+            ]
+            
+            await update.message.reply_text(
+                f"👤 المستخدم: {user['username'] or reward_user_id}\n"
+                f"🆔 ID: {reward_user_id}\n"
+                f"💰 الرصيد الحالي: {user['available']} جنيه\n\n"
+                f"اختر مبلغ المكافأة:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
+    # Admin: clear balance - waiting for ID
+    if context.user_data.get("admin_clear_balance_waiting_id") and is_admin(user_id):
+        context.user_data.pop("admin_clear_balance_waiting_id")
+        try:
+            clear_user_id = int(text)
+            user = db.get_user(clear_user_id)
+            if not user:
+                await update.message.reply_text("❌ المستخدم غير موجود في قاعدة البيانات.")
+                return
+            
+            total = user['available'] + user['reserved'] + user['referral_balance']
+            if total == 0:
+                await update.message.reply_text(
+                    f"⚠️ المستخدم ليس لديه رصيد\n"
+                    f"👤 {user['username'] or clear_user_id} (ID: {clear_user_id})"
+                )
+                return
+            
+            # Clear the balance
+            db.clear_user_balance(clear_user_id)
+            await update.message.reply_text(
+                f"✅ تم مسح رصيد المستخدم بالكامل\n"
+                f"👤 {user['username'] or clear_user_id} (ID: {clear_user_id})\n"
+                f"💰 الرصيد الممسوح: {total} جنيه"
+            )
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+        except ValueError:
+            await update.message.reply_text("❌ يرجى إرسال ID صحيح (رقم فقط).")
+        return
+
     # Admin: removing admin
     if context.user_data.get("admin_removing_admin") and is_admin(user_id):
         context.user_data.pop("admin_removing_admin")
