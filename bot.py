@@ -471,9 +471,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo = update.message.photo[-1]
     file_id = photo.file_id
 
+    print(f"[DEBUG] Photo received from user {user_id}")
+    print(f"[DEBUG] context.user_data: {context.user_data}")
+    print(f"[DEBUG] context.bot_data.get('resubmit_tasks'): {context.bot_data.get('resubmit_tasks', {})}")
+
     # User: submitting task proof
     if context.user_data.get("submitting_proof_for_task"):
         task_id = context.user_data.pop("submitting_proof_for_task")
+        print(f"[DEBUG] Submitting proof for task {task_id}")
         task = db.get_task(task_id)
         if not task:
             await update.message.reply_text("❌ المهمة غير موجودة.")
@@ -496,6 +501,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_key = str(user_id)
     if user_key in resubmit_tasks:
         task_id = resubmit_tasks.pop(user_key)
+        print(f"[DEBUG] Resubmitting proof for task {task_id}")
         task = db.get_task(task_id)
         if not task:
             await update.message.reply_text("❌ المهمة غير موجودة.")
@@ -537,7 +543,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ تم قبول الطلب لكن تعذر إرسال الإيصال: {str(e)}")
         return
 
-    await update.message.reply_text("اختر من القائمة:", reply_markup=get_main_menu_keyboard(user_id))
+    print(f"[DEBUG] No matching context found for photo from user {user_id}")
+    await update.message.reply_text(
+        "⚠️ لم أفهم ما تريد إرساله.\n\n"
+        "إذا كنت تريد إرسال إثبات لمهمة:\n"
+        "1. اضغط على زر 'تم التنفيذ' في رسالة المهمة\n"
+        "2. ثم أرسل الصورة مباشرة\n\n"
+        "أو اختر من القائمة:",
+        reply_markup=get_main_menu_keyboard(user_id)
+    )
 
 
 # ==================== VIDEO HANDLER ====================
