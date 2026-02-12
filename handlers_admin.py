@@ -224,18 +224,27 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 user_id = user_dict.get('id', 0)
                 username = user_dict.get('username', None)
+                first_name = user_dict.get('first_name', None)
                 available = user_dict.get('available', 0)
                 reserved = user_dict.get('reserved', 0)
                 referral_balance = user_dict.get('referral_balance', 0)
                 
+                # Get task stats
+                task_stats = db.get_user_task_stats(user_id)
+                approved_tasks = task_stats['approved']
+                rejected_tasks = task_stats['rejected']
+                
                 ref_count = db.get_referral_count(user_id)
-                display_name = username if username else str(user_id)
+                
+                # Display name
+                display_name = first_name if first_name else (username if username else str(user_id))
                 username_display = f"@{username}" if username else "لا يوجد"
                 
                 msg += (
                     f"👤 {display_name}\n"
                     f"🆔 ID: {user_id} | 📱 {username_display}\n"
-                    f"💰 متاح: {available} | 🔒 محجوز: {reserved} | 👥 إحالات: {referral_balance} | عدد: {ref_count}\n\n"
+                    f"💰 متاح: {available} | 🔒 محجوز: {reserved} | 👥 إحالات: {referral_balance}\n"
+                    f"✅ مقبول: {approved_tasks} | ❌ مرفوض: {rejected_tasks} | 🔗 عدد الإحالات: {ref_count}\n\n"
                 )
             except Exception as e:
                 msg += f"⚠️ خطأ في قراءة مستخدم: {str(e)}\n\n"
