@@ -520,12 +520,15 @@ def add_to_available(user_id, amount):
 
 def add_to_referral_balance(user_id, amount):
     try:
+        print(f"[REFERRAL] Adding {amount} EGP to user {user_id} referral balance")
         execute_query("UPDATE users SET referral_balance = referral_balance + ? WHERE id=?", (amount, user_id))
         conn.commit()
+        print(f"[REFERRAL] Successfully added {amount} EGP to user {user_id}")
     except Exception as e:
         if DB_TYPE == 'postgresql':
             conn.rollback()
-        print(f"Error adding to referral balance: {e}")
+        print(f"[REFERRAL ERROR] Failed to add to referral balance: {e}")
+
 
 
 def clear_user_balance(user_id):
