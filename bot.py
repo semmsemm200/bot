@@ -259,23 +259,60 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }
             status_text = status_map.get(task["status"], task["status"])
             
-            # Build message with task and user info
-            msg = "📋 بيانات المهمة:\n\n"
+            # Build complete message with ALL task details
+            msg = "📋 بيانات المهمة الكاملة:\n\n"
             msg += f"🆔 رقم المهمة: #{task['id']}\n"
             msg += f"📊 الحالة: {status_text}\n"
             msg += f"💰 السعر: {task['price']} جنيه\n"
             msg += f"📅 تاريخ الإنشاء: {task['created_at']}\n"
             
-            if task.get('admin_data'):
-                msg += f"📝 البيانات المرسلة: {task['admin_data'][:50]}...\n"
+            # Show completed_at if exists
+            if task.get('completed_at'):
+                msg += f"✅ تاريخ الموافقة: {task['completed_at']}\n"
             
-            msg += "\n👤 بيانات المستخدم:\n\n"
+            # Show reserved_until if exists
+            if task.get('reserved_until'):
+                msg += f"🔒 محجوز حتى: {task['reserved_until']}\n"
+            
+            # Show FULL admin_data (not truncated)
+            if task.get('admin_data'):
+                msg += f"\n📝 البيانات المرسلة:\n{task['admin_data']}\n"
+            
+            # Show proof file ID if exists
+            if task.get('proof_file_id'):
+                msg += f"\n📸 معرف الإثبات: {task['proof_file_id']}\n"
+            
+            # Show error note if exists
+            if task.get('error_note'):
+                msg += f"\n⚠️ ملاحظة الخطأ:\n{task['error_note']}\n"
+            
+            # Show description if exists
+            if task.get('description'):
+                msg += f"\n📄 الوصف: {task['description']}\n"
+            
+            msg += "\n" + "="*30 + "\n"
+            msg += "👤 بيانات المستخدم:\n\n"
             if user:
                 msg += f"🆔 ID: {user['id']}\n"
                 msg += f"👤 Username: {user['username'] or 'لا يوجد'}\n"
+                
+                # Show first_name if exists
+                if user.get('first_name'):
+                    msg += f"📛 الاسم: {user['first_name']}\n"
+                
                 msg += f"💰 رصيد متاح: {user['available']} جنيه\n"
                 msg += f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
                 msg += f"👥 رصيد إحالات: {user['referral_balance']} جنيه\n"
+                
+                # Get user task stats
+                task_stats = db.get_user_task_stats(user['id'])
+                msg += f"📊 إجمالي المهام: {task_stats['total']}\n"
+                msg += f"✅ مهام مقبولة: {task_stats['approved']}\n"
+                msg += f"❌ مهام مرفوضة: {task_stats['rejected']}\n"
+                
+                # Get referral count
+                ref_count = db.get_referral_count(user['id'])
+                msg += f"🔗 عدد الإحالات: {ref_count}\n"
             else:
                 msg += f"🆔 ID: {task['user_id']}\n"
                 msg += "⚠️ بيانات المستخدم غير متوفرة\n"
