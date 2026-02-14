@@ -959,14 +959,176 @@ async def admin_cancel_task_prompt(update: Update, context: ContextTypes.DEFAULT
     if not is_admin(query.from_user.id):
         return
     
-    # Ask for task ID directly
+    # Get all incomplete tasks (not approved, released, rejected, or cancelled)
+    incomplete_statuses = ['pending', 'data_sent', 'proof_submitted', 'error', 'error_resubmitted']
+    all_tasks = db.get_all_tasks()
+    
+    # Filter incomplete tasks
+    incomplete_tasks = [t for t in all_tasks if dict(t)['status'] in incomplete_statuses]
+    
+    if not incomplete_tasks:
+        keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+        await query.edit_message_text(
+            "✅ لا توجد مهام غير مكتملة للإلغاء.\n\n"
+            "جميع المهام إما مكتملة أو ملغاة بالفعل.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # Status mapping
+    status_map = {
+        "pending": "⏳ معلقة",
+        "data_sent": "📤 بيانات مرسلة",
+        "proof_submitted": "📸 إثبات مرسل",
+        "error": "⚠️ خطأ",
+        "error_resubmitted": "📸 إثبات معاد",
+    }
+    
+    # Build message with task list
+    msg = f"❌ إلغاء مهمة - المهام غير المكتملة ({len(incomplete_tasks)} مهمة)\n\n"
+    msg += "اختر المهمة التي تريد إلغاءها:\n\n"
+    
+    keyboard = []
+    for task in incomplete_tasks[:20]:  # Limit to 20 tasks
+        task_dict = dict(task)
+        task_id = task_dict['id']
+        user_id = task_dict['user_id']
+        status = task_dict['status']
+        price = task_dict['price']
+        status_text = status_map.get(status, status)
+        
+        # Get user info
+        user = db.get_user(user_id)
+        username = dict(user).get('username', None) if user else None
+        user_display = f"@{username}" if username else f"ID:{user_id}"
+        
+        # Create button text
+        button_text = f"#{task_id} | {user_display} | {status_text} | {price} ج"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"admin_cancel_select_{task_id}")])
+    
+    # Add manual ID input option
+    keyboard.append([InlineKeyboardButton("✏️ إدخال رقم المهمة يدوياً", callback_data="admin_cancel_manual")])
+    keyboard.append([InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")])
+    
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def admin_cancel_task_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle manual task ID input for cancellation"""
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
     context.user_data["admin_cancel_task_waiting_id"] = True
-    keyboard = [[InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]]
+    keyboard = [[InlineKeyboardButton("🔙 قائمة المهام", callback_data="admin_cancel_task")]]
     await query.edit_message_text(
-        "❌ إلغاء مهمة\n\n"
+        "✏️ إدخال رقم المهمة يدوياً\n\n"
         "📝 أرسل رقم المهمة (Task ID) التي تريد إلغاءها:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+
+async def admin_cancel_task_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show task details when selected from list"""
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        return
+    
+    task_id = int(query.data.split("_")[-1])
+    task = db.get_task(task_id)
+    
+    if not task:
+        await query.answer("❌ المهمة غير موجودة", show_alert=True)
+        await admin_cancel_task_prompt(update, context)
+        return
+    
+    # Get user info
+    user = db.get_user(task["user_id"])
+    
+    # Status mapping
+    status_map = {
+        "pending": "⏳ معلقة",
+        "data_sent": "📤 بيانات مرسلة",
+        "proof_submitted": "📸 إثبات مرسل",
+        "approved": "✅ مقبولة (محجوز)",
+        "released": "✅ مقبولة (متاح)",
+        "rejected": "❌ مرفوضة",
+        "cancelled": "🚫 ملغاة",
+        "error": "⚠️ خطأ",
+        "error_resubmitted": "📸 إثبات معاد",
+    }
+    status_text = status_map.get(task["status"], task["status"])
+    
+    # Build complete message with ALL task details
+    msg = "📋 بيانات المهمة الكاملة:\n\n"
+    msg += f"🆔 رقم المهمة: #{task['id']}\n"
+    msg += f"📊 الحالة: {status_text}\n"
+    msg += f"💰 السعر: {task['price']} جنيه\n"
+    msg += f"📅 تاريخ الإنشاء: {task['created_at']}\n"
+    
+    # Show completed_at if exists
+    if task.get('completed_at'):
+        msg += f"✅ تاريخ الموافقة: {task['completed_at']}\n"
+    
+    # Show reserved_until if exists
+    if task.get('reserved_until'):
+        msg += f"🔒 محجوز حتى: {task['reserved_until']}\n"
+    
+    # Show FULL admin_data (not truncated)
+    if task.get('admin_data'):
+        msg += f"\n📝 البيانات المرسلة:\n{task['admin_data']}\n"
+    
+    # Show proof file ID if exists
+    if task.get('proof_file_id'):
+        msg += f"\n📸 معرف الإثبات: {task['proof_file_id']}\n"
+    
+    # Show error note if exists
+    if task.get('error_note'):
+        msg += f"\n⚠️ ملاحظة الخطأ:\n{task['error_note']}\n"
+    
+    # Show description if exists
+    if task.get('description'):
+        msg += f"\n📄 الوصف: {task['description']}\n"
+    
+    msg += "\n" + "="*30 + "\n"
+    msg += "👤 بيانات المستخدم:\n\n"
+    if user:
+        msg += f"🆔 ID: {user['id']}\n"
+        msg += f"👤 Username: {user['username'] or 'لا يوجد'}\n"
+        
+        # Show first_name if exists
+        if user.get('first_name'):
+            msg += f"📛 الاسم: {user['first_name']}\n"
+        
+        msg += f"💰 رصيد متاح: {user['available']} جنيه\n"
+        msg += f"🔒 رصيد محجوز: {user['reserved']} جنيه\n"
+        msg += f"👥 رصيد إحالات: {user['referral_balance']} جنيه\n"
+        
+        # Get user task stats
+        task_stats = db.get_user_task_stats(user['id'])
+        msg += f"📊 إجمالي المهام: {task_stats['total']}\n"
+        msg += f"✅ مهام مقبولة: {task_stats['approved']}\n"
+        msg += f"❌ مهام مرفوضة: {task_stats['rejected']}\n"
+        
+        # Get referral count
+        ref_count = db.get_referral_count(user['id'])
+        msg += f"🔗 عدد الإحالات: {ref_count}\n"
+    else:
+        msg += f"🆔 ID: {task['user_id']}\n"
+        msg += "⚠️ بيانات المستخدم غير متوفرة\n"
+    
+    msg += "\n⚠️ هل تريد إلغاء هذه المهمة؟"
+    
+    # Confirmation button
+    keyboard = [
+        [InlineKeyboardButton("✅ تأكيد الإلغاء", callback_data=f"admin_do_cancel_{task_id}")],
+        [InlineKeyboardButton("🔙 قائمة المهام", callback_data="admin_cancel_task")],
+        [InlineKeyboardButton("🔙 لوحة الإدارة", callback_data="admin_panel")]
+    ]
+    
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 # ==================== ADMIN MANAGE ADMINS ====================

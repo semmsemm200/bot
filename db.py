@@ -600,6 +600,15 @@ def get_pending_tasks():
         return []
 
 
+def get_all_tasks():
+    """Get all tasks"""
+    try:
+        return safe_fetchall("SELECT * FROM tasks ORDER BY created_at DESC")
+    except Exception as e:
+        print(f"Error getting all tasks: {e}")
+        return []
+
+
 def update_task_status(task_id, status):
     try:
         execute_query("UPDATE tasks SET status=? WHERE id=?", (status, task_id))

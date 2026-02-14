@@ -25,7 +25,7 @@ from handlers_admin import (
     admin_set_fees, admin_edit_method, admin_method_min, admin_set_method_min_value,
     admin_method_fee, admin_set_method_fee_value,
     admin_add_method, admin_search_user, admin_view_user, admin_clear_balance, admin_do_clear_balance,
-    admin_cancel_task_prompt, admin_do_cancel_task, admin_manage_admins,
+    admin_cancel_task_prompt, admin_cancel_task_manual, admin_cancel_task_selected, admin_do_cancel_task, admin_manage_admins,
     admin_add_admin, admin_remove_admin, admin_set_video,
     admin_reward_user, admin_reward_select_user, admin_reward_amount, admin_reward_custom,
     admin_ban_user, admin_do_ban_user, admin_toggle_bot_with_notification
@@ -742,6 +742,10 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_do_clear_balance(update, context)
     elif data == "admin_cancel_task":
         await admin_cancel_task_prompt(update, context)
+    elif data == "admin_cancel_manual":
+        await admin_cancel_task_manual(update, context)
+    elif data.startswith("admin_cancel_select_"):
+        await admin_cancel_task_selected(update, context)
     elif data.startswith("admin_do_cancel_"):
         await admin_do_cancel_task(update, context)
     elif data == "admin_reward_user":
